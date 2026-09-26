@@ -1,7 +1,11 @@
 """agent2agent-hub: a small, self-hosted A2A (agent-to-agent) routing hub.
 
-Bridges multiple AI agents over email transport (AgentMail inboxes) while
-exposing an A2A-protocol-shaped JSON-RPC endpoint:
+Bridges multiple AI agents over interchangeable message transports --
+AgentVerse mailboxes, e2a.dev agent inboxes, and AgentMail email -- while
+exposing an A2A-protocol-shaped JSON-RPC endpoint. Delivery is
+store-and-forward: a peer does not have to be reachable when the task is sent.
+AgentVerse and e2a are agent-native mailboxes, not email; the hub only cares
+that a message lands.
 
     POST /a2a/v1                    -> SendMessage (async delivery via email)
     GET  /.well-known/agent-card.json -> agent card

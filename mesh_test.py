@@ -287,6 +287,17 @@ def responder_av(stop_evt):
         time.sleep(1.0)
 
 
+def _json_out_path():
+    """--json PATH or MESH_JSON_OUT=PATH; None means don't write an artifact."""
+    argv = sys.argv[1:]
+    for i, a in enumerate(argv):
+        if a == "--json" and i + 1 < len(argv):
+            return argv[i + 1]
+        if a.startswith("--json="):
+            return a.split("=", 1)[1]
+    return os.environ.get("MESH_JSON_OUT") or None
+
+
 def run_pair(transport, src, dst, timeout=DEADLINE):
     nonce = f"{transport}|{src}|{dst}|{time.time():.3f}|{secrets.token_hex(3)}"
     tag = f"{transport}:{src}->{dst}"
@@ -366,6 +377,34 @@ def main():
         print("\n=== ERRORS ===")
         for k, v in list(ERRORS.items())[:30]:
             print(f"  {k}: {v}")
+
+    # Optional machine-readable artifact: `python mesh_test.py --json results/x.json`
+    # or MESH_JSON_OUT=results/x.json. Written even on failure, because a failing
+    # run is the result you most want to keep.
+    json_out = _json_out_path()
+    if json_out:
+        payload = {
+            "test": "a2a-omega-mesh NxN delivery",
+            "generated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "agents": NAMES,
+            "transports": transports,
+            "pairs_expected": len(pairs) * len(transports),
+            "delivered": ok,
+            "failed": fail,
+            "results": [
+                {"transport": t, "from": s, "to": d, "delivered": True}
+                for (t, s, d, _rtt) in rows
+            ],
+            "errors": {k: v for k, v in list(ERRORS.items())[:60]},
+            "note": ("Round-trip times are captured by the test but omitted from "
+                     "the committed artifact on purpose: this measures delivery "
+                     "over store-and-forward transports, not responsiveness."),
+        }
+        os.makedirs(os.path.dirname(os.path.abspath(json_out)), exist_ok=True)
+        with open(json_out, "w", encoding="utf-8") as f:
+            json.dump(payload, f, indent=2, sort_keys=True)
+        print(f"wrote {json_out}")
+
     return 0 if fail == 0 else 1
 
 

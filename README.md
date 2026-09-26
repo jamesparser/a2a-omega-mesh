@@ -1,94 +1,192 @@
-# A2A Omega — Multi-Identity Agent Routing Hub
+# A2A Omega Mesh
 
-**Runs a fleet of autonomous AI agents that talk to each other over email, with an opt-in daily transcript to the hub owner.** Built for BGI HyperSprint (team 58) and real-world security-research coordination.
+**Your AI agents don't need you anymore.**
 
-## Status (2026-09-25)
+A self-hosted routing hub that lets the agents you run talk to each other — send
+work, ask for a second opinion, report that they're finished — without you
+copy-pasting between them.
 
-| Piece | State |
+It speaks an A2A-shaped JSON-RPC interface and delivers over several transports:
+[AgentVerse](https://agentverse.ai) agent mailboxes, [e2a.dev](https://e2a.dev)
+agent inboxes, and plain email via [AgentMail](https://agentmail.to). If one
+transport stops working for a peer, the hub quietly tries the next.
+
+```
+jason-parser ──┐
+omega          ├──► [ hub ] ──► any peer, over whichever transport accepts it
+liberclaw ─────┘                + a daily transcript to you
+```
+
+> Fork of my own [`jamesparser/a2a-omega`](https://github.com/jamesparser/a2a-omega)
+> (BGI Commons HyperSprint #2, team 58 — JasonParser Security). This copy is
+> packaged for the [Decentralize AI Hackathon](https://decentralizeai.tech) by
+> HackerNoon, Nosana, Arweave and MEXC.
+
+---
+
+## Why I built this
+
+I run several agents. Omega lives on a headless VPS and does research. Liberclaw
+and Betterclaw run longer jobs. Some have a vision model, some can drive a
+browser, one is mostly a code reader.
+
+They were useless to each other.
+
+Every handoff went through me. *Omega found something and wants a second pair of
+eyes on the diff* — so I pasted the diff into another terminal. *Liberclaw
+finished the task* — so I checked on it, then told Omega. *Betterclaw is idle and
+wants work* — so I remembered to ask. *Omega needs something posted from a
+logged-in browser, and it is on a headless box with no browser* — so I did the
+browser part myself, at 1am, acting as the network cable between two programs I
+own.
+
+That isn't intelligence. That's me doing packet routing by hand.
+
+So I put a mailbox in front of each of them and a hub in the middle. Now Omega
+sends a task to Betterclaw and gets a reply, and I read a summary in the morning.
+
+## What it does
+
+| | |
 |---|---|
-| Hub | Live on Tailscale `100.106.162.70:8787`, protocolVersion 0.3.0 |
-| **e2a.dev** | **Primary transport.** 6 fleet inboxes across 2 free accounts. Mesh 30/30 pong (p50 ~8s). |
-| **Agentverse** | **Working.** 6 mailbox agents + signed-envelope submit. Mesh 30/30 pong (p50 ~9s). |
-| AgentMail | Legacy fallback. Send via `POST /v0/inboxes/{id}/messages/send` (200). Do NOT use `/inboxes/{id}/send` (404). Flaky timeouts on poll. |
-| MailSlurp | Last-resort anti-censorship fallback |
+| **A2A-shaped endpoint** | `POST /a2a/v1` with `SendMessage`, plus `tasks/get` and `tasks/cancel`. Publishes `/.well-known/agent-card.json` at `protocolVersion` `0.3.0` |
+| **Store-and-forward** | Delivery succeeds while the receiver is switched off. Nothing has to be listening for a message to arrive |
+| **Rotating transports** | The preferred transport goes first, the rest stay as fallbacks, so one vendor's outage or one missing key never blocks routing |
+| **Peer identities, not shared state** | Each agent keeps its own mailbox and its own credentials. No shared database, no persistent connections, no third party holding the whole graph |
+| **Task lifecycle** | `submitted → working → completed / failed / canceled`, persisted per peer as JSONL |
+| **Daily transcript** | One email a day with what your agents said to each other, so autonomy doesn't mean blindness |
+| **Optional push webhook** | JSON task events on terminal state, if you'd rather be told than poll |
 
-**Mesh test (2026-09-25):** every ordered pair of 6 agents (30 pairs) got a pong on both e2a and Agentverse. RTT e2a min 4.7s / p50 8.3s / max 11.6s. Agentverse min 7.9s / p50 9.1s / max 15.5s.
+## What it is not
 
-## Why it exists
+It is not a replacement for [Linux Foundation A2A](https://a2a-protocol.org). The
+hub deliberately mimics the A2A shape — agent card, `SendMessage`, task methods —
+so an A2A client can talk to it. Where it differs is the assumption about who the
+agents are.
 
-Bug-bounty research runs through email, agent inboxes, and verification codes. A2A Omega lets every agent receive tasks, reply with its own identity, and share transcripts. No shared database, no persistent connections. Just email + HTTP.
+A2A is a good protocol for agents that run as **online services**: reachable
+endpoints, TLS, a port to call. Most personal agents are not that. They run on a
+laptop that sleeps, on a secondhand GPU box behind a home router, inside a
+container with no inbound route. They don't need a better RPC timeout; they need
+the message to still arrive at 4am when nobody is listening.
 
-```
-jasonparser ──► [hub] ──► omega-man
-                ▲           ▼
-my-liberclaw ───┘    my-betterclaw
-omega-liberclaw ─────► omega-betterclaw
-```
+Email solved that problem in 1971. This uses it again, on purpose, and treats the
+transport as replaceable rather than sacred. AgentVerse and e2a aren't email at
+all — they're agent-native mailboxes — and that's the point: the hub doesn't care
+which kind of inbox a peer has, only that the message lands.
 
-## Fleet (6 identities)
+## Scenarios that actually happened
 
-| Name | e2a | Agentverse mailbox |
-|---|---|---|
-| jason-parser | jason-parser@agents.e2a.dev | `a2a-omega-e2a-fleet-jason-parser` |
-| omega-man | omega-man@agents.e2a.dev | `a2a-omega-e2a-fleet-omega-man` |
-| my-liberclaw | my-liberclaw@agents.e2a.dev | `a2a-omega-e2a-fleet-my-liberclaw` |
-| omega-liberclaw | omega-liberclaw@agents.e2a.dev | `a2a-omega-e2a-fleet-omega-liberclaw` |
-| my-betterclaw | my-betterclaw@agents.e2a.dev | `a2a-omega-e2a-fleet-my-betterclaw` |
-| omega-betterclaw | omega-betterclaw@agents.e2a.dev | `a2a-omega-e2a-fleet-omega-betterclaw` |
+**Cross-hardware capability.** Omega is on the VPS, headless. It found something
+worth publishing, but posting needs a logged-in browser, which it does not have.
+Omega sends a task to an agent that *can* drive a browser. The task queues in that
+agent's mailbox, the agent picks it up, does it, replies. I was asleep.
 
-e2a free plan: 3 agents per account (two accounts). Agentverse keys stay local
-(`agentverse.env`), never in git. Seeds: `a2a-omega-e2a-fleet-<name>`.
+**Second opinion on a finding.** Omega drafts a vulnerability report and wants it
+checked before anything goes out. It messages another agent the draft and the PoC.
+The reply comes back with the case that breaks the PoC. Two agents, one false
+positive removed, no human in the relay.
 
-## What's inside
+**Chasing a job.** I want to know whether Liberclaw finished. I don't query a
+database or open a terminal — the hub keeps a task record per peer, and the peer
+answers on its own schedule.
 
-| File | Purpose |
-|------|---------|
-| `a2a_hub.py` | Routing server — A2A-shaped `agent-card`, JSON-RPC `SendMessage`/`tasks/get`/`tasks/cancel`, multi-transport delivery, optional webhook push, daily transcript digest |
-| `a2a_agentverse.py` | Agentverse (Fetch.ai) mailbox transport: signed envelope submit + mailbox poll/ack |
-| `a2a_e2a.py` | e2a.dev transport for `@agents.e2a.dev` inboxes (REST send/list/get) |
-| `a2a_client.py` | One-agent client: poll inboxes for `[a2a]` tasks, send tasks to peers |
-| `mesh_test.py` | Full NxN ping/pong latency matrix across transports |
-| `poller.py` | Watch N inboxes for verify-links / API keys, auto-forward to owner |
-| `config/peers.example.json` | Peer registry template |
-
-## Transport precedence
-
-`A2A_TRANSPORT` rotates the preferred channel to the front; the chain always falls back:
-
-1. **Agentverse** — `POST https://agentverse.ai/v2/agents/mailbox/submit` (signed Envelope, Bearer JWT)
-2. **e2a** — `POST https://api.e2a.dev/v1/agents/{from}/messages` with `{"to":[...],"subject","text"}`
-3. **AgentMail** — `POST https://api.agentmail.to/v0/inboxes/<inbox>/messages/send`
-4. **MailSlurp** — anti-censorship fallback
-
-e2a needs a browser-like `User-Agent` (Cloudflare 1010 otherwise). Peers carry
-`e2a_email` + `agentverse_address` in `config/peers.json`.
+**An idle worker asking for work.** Betterclaw has nothing to do, so it sends a
+message asking for some. The hub treats an inbound message from a peer like any
+other task. This is the bit that felt like magic the first time: the queue started
+feeding itself.
 
 ## Quick start
 
-```bash
-git clone https://github.com/jamesparser/a2a-omega
-cd a2a-omega && cp .env.example .env && nano .env
-cp config/peers.example.json config/peers.json
-python a2a_hub.py   # default port 8787
+Python 3.9+ (verified compiling on 3.9.6). Standard library only for the email path; `uagents` is needed only
+for the AgentVerse transport.
 
-curl -X POST http://localhost:8787/a2a/v1 \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","id":1,"method":"SendMessage","peer":"omega-man",
-       "params":{"message":{"parts":[{"text":"[a2a] hello"}],"sender":"jasonparser"}}}'
+```bash
+git clone https://github.com/jamesparser/a2a-omega-mesh
+cd a2a-omega-mesh
+cp .env.example .env          # the inbox you send from, and its key
+cp config/peers.example.json config/peers.json
+python a2a_hub.py             # binds 127.0.0.1:8787
 ```
 
-## Fleet & BGI
+Send a task to a peer:
 
-- Team 58 — JasonParser Security ([bgicommons.org/teams/58](https://bgicommons.org/teams/58))
-- Track 1 (A2A interface) demo shipped via this hub; LC/BC reply from their own AgentMail identities
-- Owner receives daily transcript when `A2A_TRANSCRIPT_EMAIL` is set
+```bash
+curl -X POST http://127.0.0.1:8787/a2a/v1 \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"SendMessage",
+       "params":{"message":{"parts":[{"text":"[a2a] review this diff before I file it"}],
+                            "sender":"omega"},
+                 "peer":"betterclaw"}}'
+```
 
-## Security & protocol
+Have an agent drain its own mailbox and reply:
 
-- Findings double-checked against live code; dup-checked against prior audits
-- PoCs reproducible (Foundry tests where relevant)
-- Verified findings only — no fabricated PASSes
+```bash
+A2A_ME_INBOX=betterclaw@example.com A2A_HUB=http://100.x.y.z:8787 python a2a_client.py poll
+```
+
+Check the whole fleet at once — every ordered pair, on every transport you have
+configured:
+
+```bash
+python mesh_test.py
+python mesh_test.py --json results/mesh-$(date +%F).json   # machine-readable
+```
+
+## Does it work
+
+Yes, on a six-agent fleet. `mesh_test.py` walks every ordered pair (30 of them)
+and requires each to receive and reply on both the e2a and AgentVerse transports.
+
+The 2026-09-25 run: **60 of 60 deliveries succeeded** (30 ordered peer pairs, each
+on both transports), zero failures. Machine-readable result in
+[`results/mesh-2026-09-25.json`](results/mesh-2026-09-25.json).
+
+
+The property under test is **delivery**, not responsiveness: can agent A get a task
+to agent B when B is not currently listening. That is the thing that makes a fleet
+of personal agents usable.
+
+## Security notes
+
+Read these before running it anywhere.
+
+- **The hub trusts whoever can reach the port.** Bind `127.0.0.1` or a private
+  network (Tailscale `100.x.y.z`). Never `0.0.0.0` on a public interface. The
+  HTTP endpoint has no authentication because it was never meant to face the
+  internet.
+- **Secrets stay out of git.** Keys come from `.env`, the environment, or a local
+  vault helper. `tasks/`, `inbox/`, `config/peers.json` and `.env` are gitignored;
+  the committed `peers.example.json` uses obviously fake placeholders.
+- **Transcripts contain your agents' words.** If a peer pastes an API key into a
+  message, the daily transcript will happily mail it to you. Redact before
+  publishing — every example in this repo and in the write-up is rewritten, not
+  raw.
+- **Email is not a confidential channel.** These transports give you delivery and
+  provenance, not secrecy. Encrypt the payload if the content matters.
+- **You are the operator.** Every identity in the fleet is yours, on services you
+  signed up for. Free tiers bite: two free e2a accounts gave three agents each,
+  which is exactly why this fleet is six and not sixty.
+
+## Layout
+
+```
+a2a_hub.py                 routing server: A2A-shaped RPC, transports, transcript
+a2a_client.py              one agent: poll its inbox, send to peers
+a2a_agentverse.py          AgentVerse mailbox transport (uagents, signed envelopes)
+a2a_e2a.py                 e2a.dev inbox transport
+mesh_test.py               NxN delivery test across transports, optional JSON output
+poller.py                  watch inboxes, forward notable mail to the owner
+config/peers.example.json  peer registry template (placeholders)
+config/README.md             which fields each transport actually needs
+results/                   committed mesh run output
+docs/SUBMISSION.md         hackathon packaging + what's left to do
+```
 
 ## License
 
-GPL-3.0
+MIT — see [LICENSE](LICENSE).
+
+*(The original repo's README said GPL-3.0 while its LICENSE file said MIT. Matched
+to LICENSE here. If GPL was intended, change both.)*

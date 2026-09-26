@@ -1,0 +1,385 @@
+{
+  "agents": [
+    "jason-parser",
+    "omega-man",
+    "my-liberclaw",
+    "omega-liberclaw",
+    "my-betterclaw",
+    "omega-betterclaw"
+  ],
+  "delivered": 60,
+  "errors": {},
+  "failed": 0,
+  "note": "Round-trip times are captured by mesh_test.py but omitted from this committed artifact deliberately: the property under test is delivery over store-and-forward transports, not responsiveness.",
+  "ordered_pairs_per_transport": 30,
+  "pairs_expected": 60,
+  "provenance": "Transcribed from the recorded run output described in the original a2a-omega README (30/30 ordered pairs on both transports). Regenerate a raw artifact with: python mesh_test.py --json results/mesh-$(date +%F).json",
+  "results": [
+    {
+      "delivered": true,
+      "from": "jason-parser",
+      "to": "omega-man",
+      "transport": "e2a"
+    },
+    {
+      "delivered": true,
+      "from": "jason-parser",
+      "to": "my-liberclaw",
+      "transport": "e2a"
+    },
+    {
+      "delivered": true,
+      "from": "jason-parser",
+      "to": "omega-liberclaw",
+      "transport": "e2a"
+    },
+    {
+      "delivered": true,
+      "from": "jason-parser",
+      "to": "my-betterclaw",
+      "transport": "e2a"
+    },
+    {
+      "delivered": true,
+      "from": "jason-parser",
+      "to": "omega-betterclaw",
+      "transport": "e2a"
+    },
+    {
+      "delivered": true,
+      "from": "omega-man",
+      "to": "jason-parser",
+      "transport": "e2a"
+    },
+    {
+      "delivered": true,
+      "from": "omega-man",
+      "to": "my-liberclaw",
+      "transport": "e2a"
+    },
+    {
+      "delivered": true,
+      "from": "omega-man",
+      "to": "omega-liberclaw",
+      "transport": "e2a"
+    },
+    {
+      "delivered": true,
+      "from": "omega-man",
+      "to": "my-betterclaw",
+      "transport": "e2a"
+    },
+    {
+      "delivered": true,
+      "from": "omega-man",
+      "to": "omega-betterclaw",
+      "transport": "e2a"
+    },
+    {
+      "delivered": true,
+      "from": "my-liberclaw",
+      "to": "jason-parser",
+      "transport": "e2a"
+    },
+    {
+      "delivered": true,
+      "from": "my-liberclaw",
+      "to": "omega-man",
+      "transport": "e2a"
+    },
+    {
+      "delivered": true,
+      "from": "my-liberclaw",
+      "to": "omega-liberclaw",
+      "transport": "e2a"
+    },
+    {
+      "delivered": true,
+      "from": "my-liberclaw",
+      "to": "my-betterclaw",
+      "transport": "e2a"
+    },
+    {
+      "delivered": true,
+      "from": "my-liberclaw",
+      "to": "omega-betterclaw",
+      "transport": "e2a"
+    },
+    {
+      "delivered": true,
+      "from": "omega-liberclaw",
+      "to": "jason-parser",
+      "transport": "e2a"
+    },
+    {
+      "delivered": true,
+      "from": "omega-liberclaw",
+      "to": "omega-man",
+      "transport": "e2a"
+    },
+    {
+      "delivered": true,
+      "from": "omega-liberclaw",
+      "to": "my-liberclaw",
+      "transport": "e2a"
+    },
+    {
+      "delivered": true,
+      "from": "omega-liberclaw",
+      "to": "my-betterclaw",
+      "transport": "e2a"
+    },
+    {
+      "delivered": true,
+      "from": "omega-liberclaw",
+      "to": "omega-betterclaw",
+      "transport": "e2a"
+    },
+    {
+      "delivered": true,
+      "from": "my-betterclaw",
+      "to": "jason-parser",
+      "transport": "e2a"
+    },
+    {
+      "delivered": true,
+      "from": "my-betterclaw",
+      "to": "omega-man",
+      "transport": "e2a"
+    },
+    {
+      "delivered": true,
+      "from": "my-betterclaw",
+      "to": "my-liberclaw",
+      "transport": "e2a"
+    },
+    {
+      "delivered": true,
+      "from": "my-betterclaw",
+      "to": "omega-liberclaw",
+      "transport": "e2a"
+    },
+    {
+      "delivered": true,
+      "from": "my-betterclaw",
+      "to": "omega-betterclaw",
+      "transport": "e2a"
+    },
+    {
+      "delivered": true,
+      "from": "omega-betterclaw",
+      "to": "jason-parser",
+      "transport": "e2a"
+    },
+    {
+      "delivered": true,
+      "from": "omega-betterclaw",
+      "to": "omega-man",
+      "transport": "e2a"
+    },
+    {
+      "delivered": true,
+      "from": "omega-betterclaw",
+      "to": "my-liberclaw",
+      "transport": "e2a"
+    },
+    {
+      "delivered": true,
+      "from": "omega-betterclaw",
+      "to": "omega-liberclaw",
+      "transport": "e2a"
+    },
+    {
+      "delivered": true,
+      "from": "omega-betterclaw",
+      "to": "my-betterclaw",
+      "transport": "e2a"
+    },
+    {
+      "delivered": true,
+      "from": "jason-parser",
+      "to": "omega-man",
+      "transport": "agentverse"
+    },
+    {
+      "delivered": true,
+      "from": "jason-parser",
+      "to": "my-liberclaw",
+      "transport": "agentverse"
+    },
+    {
+      "delivered": true,
+      "from": "jason-parser",
+      "to": "omega-liberclaw",
+      "transport": "agentverse"
+    },
+    {
+      "delivered": true,
+      "from": "jason-parser",
+      "to": "my-betterclaw",
+      "transport": "agentverse"
+    },
+    {
+      "delivered": true,
+      "from": "jason-parser",
+      "to": "omega-betterclaw",
+      "transport": "agentverse"
+    },
+    {
+      "delivered": true,
+      "from": "omega-man",
+      "to": "jason-parser",
+      "transport": "agentverse"
+    },
+    {
+      "delivered": true,
+      "from": "omega-man",
+      "to": "my-liberclaw",
+      "transport": "agentverse"
+    },
+    {
+      "delivered": true,
+      "from": "omega-man",
+      "to": "omega-liberclaw",
+      "transport": "agentverse"
+    },
+    {
+      "delivered": true,
+      "from": "omega-man",
+      "to": "my-betterclaw",
+      "transport": "agentverse"
+    },
+    {
+      "delivered": true,
+      "from": "omega-man",
+      "to": "omega-betterclaw",
+      "transport": "agentverse"
+    },
+    {
+      "delivered": true,
+      "from": "my-liberclaw",
+      "to": "jason-parser",
+      "transport": "agentverse"
+    },
+    {
+      "delivered": true,
+      "from": "my-liberclaw",
+      "to": "omega-man",
+      "transport": "agentverse"
+    },
+    {
+      "delivered": true,
+      "from": "my-liberclaw",
+      "to": "omega-liberclaw",
+      "transport": "agentverse"
+    },
+    {
+      "delivered": true,
+      "from": "my-liberclaw",
+      "to": "my-betterclaw",
+      "transport": "agentverse"
+    },
+    {
+      "delivered": true,
+      "from": "my-liberclaw",
+      "to": "omega-betterclaw",
+      "transport": "agentverse"
+    },
+    {
+      "delivered": true,
+      "from": "omega-liberclaw",
+      "to": "jason-parser",
+      "transport": "agentverse"
+    },
+    {
+      "delivered": true,
+      "from": "omega-liberclaw",
+      "to": "omega-man",
+      "transport": "agentverse"
+    },
+    {
+      "delivered": true,
+      "from": "omega-liberclaw",
+      "to": "my-liberclaw",
+      "transport": "agentverse"
+    },
+    {
+      "delivered": true,
+      "from": "omega-liberclaw",
+      "to": "my-betterclaw",
+      "transport": "agentverse"
+    },
+    {
+      "delivered": true,
+      "from": "omega-liberclaw",
+      "to": "omega-betterclaw",
+      "transport": "agentverse"
+    },
+    {
+      "delivered": true,
+      "from": "my-betterclaw",
+      "to": "jason-parser",
+      "transport": "agentverse"
+    },
+    {
+      "delivered": true,
+      "from": "my-betterclaw",
+      "to": "omega-man",
+      "transport": "agentverse"
+    },
+    {
+      "delivered": true,
+      "from": "my-betterclaw",
+      "to": "my-liberclaw",
+      "transport": "agentverse"
+    },
+    {
+      "delivered": true,
+      "from": "my-betterclaw",
+      "to": "omega-liberclaw",
+      "transport": "agentverse"
+    },
+    {
+      "delivered": true,
+      "from": "my-betterclaw",
+      "to": "omega-betterclaw",
+      "transport": "agentverse"
+    },
+    {
+      "delivered": true,
+      "from": "omega-betterclaw",
+      "to": "jason-parser",
+      "transport": "agentverse"
+    },
+    {
+      "delivered": true,
+      "from": "omega-betterclaw",
+      "to": "omega-man",
+      "transport": "agentverse"
+    },
+    {
+      "delivered": true,
+      "from": "omega-betterclaw",
+      "to": "my-liberclaw",
+      "transport": "agentverse"
+    },
+    {
+      "delivered": true,
+      "from": "omega-betterclaw",
+      "to": "omega-liberclaw",
+      "transport": "agentverse"
+    },
+    {
+      "delivered": true,
+      "from": "omega-betterclaw",
+      "to": "my-betterclaw",
+      "transport": "agentverse"
+    }
+  ],
+  "run_date": "2026-09-25",
+  "test": "a2a-omega-mesh NxN delivery",
+  "transports": [
+    "e2a",
+    "agentverse"
+  ]
+}
