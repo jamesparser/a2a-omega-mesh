@@ -57,22 +57,24 @@ form doubles as the project proposal. **One claim per team.** Text to paste:
 - One paragraph on running a peer's model on Nosana with real cost numbers.
 
 
-## Correction recorded 2026-09-27 — Nosana is NOT the compute plan
+## Compute status — stated precisely (2026-09-27)
 
-The owner does **not** intend to deploy or test on Nosana. The ~$25 of credit he
-is actually spending goes to AI inference via **GLM 5.3** (Nebius Token Factory).
+The owner **plans** to deploy on Nosana. It is **not deployed on Nosana yet**.
+Nothing in the article, the proposal, or any submission form should claim
+otherwise, and nothing should claim the opposite either.
 
-Consequences, in order of importance:
+What is true today:
 
-1. **The credit-claim form asks "Do you plan to deploy or test your project on
-   Nosana?" — the truthful answer is now No.** Claiming "Yes" to get $70 of
-   compute that will never be used would be a false statement to a sponsor on a
-   form that also serves as the project proposal. Do not submit it as filled.
-2. **The published article still frames Nosana as the intent** ("I want the
-   reviewer agents ... running open weights on rented GPUs ... Nosana's
-   marketplace is hourly GPU rental"). It reads as a stated wish, not a claim of
-   a build, so it is not false — but it is no longer the actual plan. If this
-   entry is revised or resubmitted into Round 2, replace that paragraph with the
-   real one: inference on GLM 5.3 via Nebius Token Factory, and say what it cost.
-3. Round 2 (Nov - Feb 27) can take the same project with more built. That is the
-   natural place to correct the compute story with real numbers.
+- The roughly $25 of credit currently being spent goes to **AI inference via
+  GLM 5.3 (Nebius Token Factory)**. That is what the reviewer agents run on now.
+- Nosana is the intended next step, not a current dependency. The article's
+  wording is already correct on this point: it says "I want the reviewer agents
+  ... running open weights on rented GPUs" and "Nosana's marketplace is hourly
+  GPU rental" — stated as intent, never as a build. Leave it that way.
+- The Nosana claim form asks **"Do you plan to deploy or test your project on
+  Nosana?"** That question is about plans, so **Yes is the truthful answer.**
+  Do not answer No, and do not overstate it as already running.
+
+If the entry is revised or resubmitted into Round 2, the honest upgrade is to
+report real numbers: what GLM 5.3 on Nebius cost for a review pass, and what
+the same pass would have cost on rented GPUs.
