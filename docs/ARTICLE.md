@@ -4,13 +4,18 @@
 
 > **Status:** submitted to HackerNoon editors 2026-09-27 (draft id
 > `6ab88985db16a69b1ffa3433`, author handle `@jasonparser`). This file is the
-> **published** text — it was synced back from the live editor, so it now
-> differs from the first draft on purpose. Three edits were made in the editor
-> and are reflected below: the "Fork of a2a-omega, which I built for BGI
-> Commons HyperSprint #2" sentence was dropped from the closing paragraph,
-> "skip my middlebox — you'll be glad you did" was softened to "skip my
-> solution", and the inline-code styling inside the results link was removed.
-> Word count as published: 1,258 (HackerNoon's counter).
+> **published** text, synced back from the live editor, so it differs from the
+> first draft on purpose. Three edits were made in the editor and are reflected
+> below: the "Fork of a2a-omega, which I built for BGI Commons HyperSprint #2"
+> sentence was dropped from the closing paragraph, "skip my middlebox, you'll be
+> glad you did" was softened to "skip my solution", and the inline-code styling
+> inside the results link was removed. Word count as published: 1,258.
+>
+> **KNOWN DEFECT, not yet fixed:** the body below uses 19 em dashes, which
+> violates the owner's global writing rule. This file is a record of what is
+> live, so the dashes were deliberately left in place rather than quietly
+> diverging from the published version. Fix them in the HackerNoon draft first,
+> then re-sync this file. See docs/HANDOVER-PROMPT.md task 1.
 
 ---
 
