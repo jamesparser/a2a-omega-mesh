@@ -9,7 +9,15 @@ Byline: **Jason Parser** (the GitHub handle `jamesparser` is a legacy typo; leav
 Round 1 closes **31 Oct 2026**. Half the pool is awarded per round, and the same
 project can be resubmitted into Round 2 (Nov-Feb) with more built.
 
-## Claim the credits first (do this today)
+## Credit claim — DONE 2026-09-27
+
+Submitted and accepted (`POST /api/claim/nosana` -> `{"ok":true}`, "SUBMISSION RECEIVED").
+Deploy-on-Nosana answered **Yes** (the form asks about plans; the plan is real, the
+deployment is not yet done). Credit access instructions arrive by email after review.
+
+Original paste text, kept for the record:
+
+## Claim the credits (done)
 
 https://decentralizeai.tech/claim/nosana - $70 Nosana compute, first 500, and the
 form doubles as the project proposal. **One claim per team.** Text to paste:
@@ -31,7 +39,7 @@ form doubles as the project proposal. **One claim per team.** Text to paste:
 | Deployment URL **or** reproducible metrics | metrics satisfied; a live URL is still missing |
 | Featured image | `docs/featured.png` (uploaded to HackerNoon CDN as `images/img-5p03rto.png`) |
 | Demo | **not yet** - hub binds 127.0.0.1/Tailscale, so no public endpoint. Needs a ~40s recording |
-| HackerNoon post | **submitted 2026-09-27**, in editorial review — draft id `6ab88985db16a69b1ffa3433`, author `@jasonparser`. Canonical text is `docs/ARTICLE.md` (synced back from the editor) |
+| HackerNoon post | **submitted 2026-09-27 13:25, in editorial review (not public yet)** — draft id `6ab88985db16a69b1ffa3433`, author `@jasonparser`. Canonical text is `docs/ARTICLE.md` (synced back from the editor) |
 
 ## Blockers - owner only
 
