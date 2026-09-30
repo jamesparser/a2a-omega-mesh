@@ -473,6 +473,9 @@ class Handler(BaseHTTPRequestHandler):
                     {"id": "agent-to-agent", "name": "Cross-agent messaging",
                      "description": "Route a text task to a peer agent's inbox; async delivery, result on poll or webhook.",
                      "tags": ["a2a", "multi-agent", "whitehat"]},
+                    {"id": "fleet-broadcast", "name": "Fleet broadcast",
+                     "description": "Fan one message out to every other peer. Each target gets its own task id under a shared broadcast id.",
+                     "tags": ["a2a", "multi-agent", "ops"]},
                     {"id": "daily-transcript", "name": "Daily transcript",
                      "description": "Owner receives a digest of all agent<->agent exchanges.",
                      "tags": ["ops", "logging"]},
@@ -508,6 +511,8 @@ class Handler(BaseHTTPRequestHandler):
         params = payload.get("params") or {}
         # A2A-spec methods + legacy aliases:
         #   SendMessage / message/send / tasks/send -> async task delivery
+        #   Broadcast / message/broadcast / SendMessage with peer "*" or "all"
+        #       -> fan the same task out to every peer except the sender
         #   tasks/get (alias GET /tasks/<id>) -> task state
         #   tasks/cancel -> mark a not-yet-completed task canceled
         #   OMITTED method (some A2A SDKs send params without a method field)
@@ -536,10 +541,11 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(404, {"jsonrpc": "2.0", "id": payload.get("id"),
                                   "error": f"task {task_id} not found or already terminal"})
             return
-        if method not in ("SendMessage", "message/send", "tasks/send") and method is not None:
+        if method not in ("SendMessage", "message/send", "tasks/send",
+                          "Broadcast", "message/broadcast", "tasks/broadcast") and method is not None:
             self._send_json(400, {"jsonrpc": "2.0", "id": payload.get("id"),
                                   "error": f"unknown method {method!r}",
-                                  "hint": "POST JSON-RPC to /a2a/v1: {\"method\":\"SendMessage\",\"peer\":\"<peer>\",\"params\":{\"message\":{\"messageId\":...,\"parts\":[{\"text\":...}],\"sender\":...}}} | tasks/get | tasks/cancel"})
+                                  "hint": "POST JSON-RPC to /a2a/v1: {\"method\":\"SendMessage\",\"peer\":\"<peer>\",\"params\":{\"message\":{\"messageId\":...,\"parts\":[{\"text\":...}],\"sender\":...}}} | Broadcast (peer \"*\" or \"all\") | tasks/get | tasks/cancel"})
             return
 
         params = payload.get("params") or {}
@@ -554,6 +560,41 @@ class Handler(BaseHTTPRequestHandler):
         sender = msg.get("sender") or payload.get("peer") or "unknown"
         peer = payload.get("peer") or sender
         peer = str(peer).replace("/", "_")
+
+        wants_broadcast = (
+            method in ("Broadcast", "message/broadcast", "tasks/broadcast")
+            or str(peer).lower() in ("*", "all", "broadcast")
+            or payload.get("broadcast") is True
+        )
+        if wants_broadcast:
+            peers = load_peers()
+            targets = [n for n in peers if n != sender and n != "unknown"]
+            broadcast_id = f"bc-{int(time.time())}"
+            started = []
+            for name in targets:
+                safe = str(name).replace("/", "_")
+                eid = f"{broadcast_id}-{safe}"
+                entry = {"id": eid, "peer": safe, "sender": sender, "prompt": prompt,
+                         "broadcast": broadcast_id, "status": "submitted", "result": None,
+                         "updated": time.time(),
+                         "history": [{"status": "submitted", "ts": time.time()}]}
+                tasks.setdefault(safe, []).append(entry)
+                threading.Thread(target=_route, args=(safe, entry), daemon=True).start()
+                started.append({"peer": safe, "id": eid})
+            self._send_json(200, {
+                "jsonrpc": "2.0", "id": payload.get("id"),
+                "result": {
+                    "broadcast": {
+                        "id": broadcast_id,
+                        "from": sender,
+                        "status": "submitted",
+                        "targets": started,
+                        "target_count": len(started),
+                        "note": "fan-out to every peer except sender; each target has its own task id",
+                    }
+                },
+            })
+            return
 
         entry = {"id": str(task_id), "peer": peer, "sender": sender, "prompt": prompt,
                  "status": "submitted", "result": None, "updated": time.time(),

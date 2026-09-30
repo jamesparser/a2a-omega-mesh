@@ -70,12 +70,12 @@ collaborate while others are offline.
 
 ## Remaining work, in order
 
-**1. Fix the em dashes in the article.** 21 of them are in the live draft. Rewrite
-each one as a period, comma, colon, or restructured sentence, keeping the voice and
-the word count roughly intact. Do not change any technical claim while doing it.
-Then decide with the owner whether to push the edit now or wait until publication,
-because editing a story that is sitting in the review queue may restart that wait.
-If he wants the entry filed fast, wait for publication, then revise.
+**1. Do NOT go edit the em dashes out of the published article.** The live draft
+contains 19 of them. The owner was told and decided on 2026-09-27 to leave the
+article exactly as it is, because editing a story sitting in the review queue may
+restart the review. The dashes are a known, accepted defect in that one text. The
+rule applies to everything you write from now on, not to retro-cleaning his
+published work. Do not "helpfully" fix it, and do not re-raise it.
 
 **2. Watch for publication, then post the tweet.** Once the article goes live, get
 its real URL and post it from **@JasonParserSec** (never @RealCryptoCapHQ, and do

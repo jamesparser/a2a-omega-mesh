@@ -35,20 +35,22 @@ form doubles as the project proposal. **One claim per team.** Text to paste:
 | Required by FAQ | Status |
 |---|---|
 | Working code | done - public repo, full history, MIT |
+| Mesh-specific feature | **Broadcast.** `Broadcast` / `SendMessage` with peer `*` fans one message to every other peer, each with its own task id. `python a2a_client.py broadcast "text"`. Optional `check` for shell exit codes. Does not touch production crons. |
 | Reproducible metrics | done - `results/mesh-2026-09-25.json`, 60/60 deliveries (30 pairs x 2 transports) |
 | Deployment URL **or** reproducible metrics | metrics satisfied; a live URL is still missing |
 | Featured image | `docs/featured.png` (uploaded to HackerNoon CDN as `images/img-5p03rto.png`) |
-| Demo | **not yet** - hub binds 127.0.0.1/Tailscale, so no public endpoint. Needs a ~40s recording |
-| HackerNoon post | **submitted 2026-09-27 13:25, in editorial review (not public yet)** — draft id `6ab88985db16a69b1ffa3433`, author `@jasonparser`. Canonical text is `docs/ARTICLE.md` (synced back from the editor) |
+| Demo | **cut ready** - `assets/a2a-omega-demo-46s.mp4` (40s BGI live exchange + 6s daily transcript still). Hub stays private (127.0.0.1/Tailscale). Sources: trimmed BGI clip + `assets/daily-transcript-email-still.png`. |
+| HackerNoon post | **submitted 2026-09-27 13:25, in editorial review (not public yet)** - draft id `6ab88985db16a69b1ffa3433`, author `@jasonparser`. Canonical text is `docs/ARTICLE.md` (synced back from the editor) |
 
 ## Blockers - owner only
 
 1. **Re-run the mesh test** and commit raw output:
    `python mesh_test.py --json results/mesh-$(date +%F).json`
    Keys live on the VPS, so the committed file is transcribed from the 25 Sep run.
-2. **Record ~40s of two agents exchanging a task and a reply**, plus the daily
-   transcript email arriving. Redact anything key-shaped first - transcripts quote
-   messages verbatim.
+2. **Demo clip is cut** (`assets/a2a-omega-demo-40s.mp4`) from the existing BGI
+   video. Lowest-credit path. Optional add-on: a still of the daily transcript
+   email if the entry form wants that beat on camera. Redact anything key-shaped
+   if you shoot new material.
 3. **Decide on a public endpoint.** Recommended: keep the hub private, use the
    recording. A public hub has **no authentication** by design.
 4. **Confirm the license.** Upstream README said GPL-3.0 while LICENSE said MIT.
@@ -70,6 +72,15 @@ form doubles as the project proposal. **One claim per team.** Text to paste:
 The owner **plans** to deploy on Nosana. It is **not deployed on Nosana yet**.
 Nothing in the article, the proposal, or any submission form should claim
 otherwise, and nothing should claim the opposite either.
+
+**Credit delivery status (checked 2026-09-28):** The $70 claim was submitted
+2026-09-27 (`POST /api/claim/nosana` -> `{"ok":true}`). A Nosana Deploy account
+exists (Google sign-in to deploy.nosana.com, 2026-09-28 06:44 BKK). Inbox has
+only the generic "Welcome to Nosana" mail from `social@nosana.io`, which tells
+you to top up and has **no credit code**. The hackathon credit email has not
+arrived. Current inference spend is still **GLM 5.3 on Nebius Token Factory**,
+not Nosana GPUs. Do not write that Nosana credits are in use, and do not write
+that the Nosana path was abandoned.
 
 What is true today:
 

@@ -50,6 +50,8 @@ sends a task to Betterclaw and gets a reply, and I read a summary in the morning
 | | |
 |---|---|
 | **A2A-shaped endpoint** | `POST /a2a/v1` with `SendMessage`, plus `tasks/get` and `tasks/cancel`. Publishes `/.well-known/agent-card.json` at `protocolVersion` `0.3.0` |
+| **Broadcast to the fleet** | `Broadcast` (or `SendMessage` with peer `*` / `all`) fans one message out to every other peer. Each target gets its own task id under a shared `broadcast` id. `python a2a_client.py broadcast "text"` |
+| **Cron-ready inbox check** | `python a2a_client.py check` prints `NEW_TASKS=n` and exits 1 when there is new work, 0 when idle. Optional shell helper. Does not replace existing agent pings |
 | **Store-and-forward** | Delivery succeeds while the receiver is switched off. Nothing has to be listening for a message to arrive |
 | **Rotating transports** | The preferred transport goes first, the rest stay as fallbacks, so one vendor's outage or one missing key never blocks routing |
 | **Peer identities, not shared state** | Each agent keeps its own mailbox and its own credentials. No shared database, no persistent connections, no third party holding the whole graph |
@@ -132,6 +134,46 @@ configured:
 ```bash
 python mesh_test.py
 python mesh_test.py --json results/mesh-$(date +%F).json   # machine-readable
+```
+
+## Add another agent
+
+1. Give the agent its own inbox on one of the transports (AgentVerse, e2a.dev, or AgentMail).
+2. Open `config/peers.json` and add a block with the peer name you want other agents to use.
+3. Fill only the fields that transport needs. See `config/README.md`.
+4. Reload is free: the hub re-reads `peers.json` on every routing call. No restart required.
+5. Prove it: `python mesh_test.py` or send one task with `SendMessage`.
+
+Example peer entry:
+
+```json
+"new-agent": {
+  "e2a_email": "new-agent@agents.e2a.dev",
+  "note": "research peer"
+}
+```
+
+Agents do not need a public URL. They need an inbox the hub can write to and a way to read that inbox later.
+
+## Keep agents picking up work
+
+Store-and-forward means a message can sit in a mailbox until some process reads it.
+On a real fleet that process is usually a short poll on a timer.
+
+Recommended for installers: every agent runs a poll about every 5 minutes.
+
+```bash
+# crontab -e on the machine that owns that agent
+*/5 * * * *  cd /path/to/a2a-omega-mesh && A2A_ME_INBOX=you@example.com A2A_HUB=http://127.0.0.1:8787 python a2a_client.py poll >> /tmp/a2a-poll.log 2>&1
+```
+
+If you already have agent loops that check mail, keep them. Do not stack a second
+poller on top. `a2a_client.py check` is only there if a shell exit code is useful.
+
+Optional fleet fan-out:
+
+```bash
+python a2a_client.py broadcast "status note for everyone"
 ```
 
 ## Does it work
