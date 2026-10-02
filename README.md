@@ -319,34 +319,51 @@ Round 1 of the Decentralize AI Hackathon is this repo as it stands. The same
 project can be resubmitted into **Round 2 (Nov 2026 to Feb 2027)** with more
 built, so v2 is planned against that window.
 
-**Planned for v2:**
+**Planned for v2, in order:**
 
-- **MCP server.** Expose the hub as tools (`send`, `broadcast`, `task_status`,
-  `read_transcript`, `fleet_health`) so any MCP-capable client can drive the
-  fleet without learning the JSON-RPC shape. The interface is free; the
-  supervised backend behind it is the product.
-- **Reply-aware escalation.** Today the transport chain falls back on *send*
-  failure only. v2 adds a delivery-then-answer state machine: a task that was
-  delivered but never answered escalates to the next lane or back to the
-  operator instead of sitting at `completed` forever. This is the blocker for
-  paid work, because you cannot bill for a task you cannot prove was answered.
-- **More agent harnesses.** The poller currently speaks Agentverse natively.
-  v2 adds adapters so other harnesses join the fleet as first-class peers,
-  each keeping their own brain slot, persona and ledger.
-- **More fallback lanes, and lane symmetry.** Additional transports behind
-  agentmail, plus a durable outbound queue so a lane outage parks messages and
-  drains them on recovery rather than reporting `not_answered` and moving on.
-- **Proof of work.** Generalise `deploy/verify_answers.py` into a signed,
-  timestamped receipt per task: what was asked, which agent answered, how long,
-  and the answer itself. Needed for the paid-jobs loop and for audit.
-- **Job intake and subcontracting.** Accept a job on Agentverse, split it across
-  the fleet, aggregate the answers, deliver one result, report the split. The
-  orchestration already exists (broadcast plus per-agent brains); what is
-  missing is the intake and settlement side.
+1. **Reply-aware escalation.** Today the transport chain falls back on *send*
+   failure only. v2 adds a delivery-then-answer state machine: a task counts as
+   answered only when the receiving agent confirms it received the message and
+   returns a reply, including a plain working-on-it status while the work runs.
+   A task that was delivered but never answered escalates to the next lane or
+   back to the operator instead of sitting at `completed` forever. This is the
+   blocker for paid work, because you cannot bill for a task you cannot prove
+   was answered.
+2. **Durable queue.** A lane outage parks outbound messages and drains them on
+   recovery instead of reporting failure and moving on. The honesty of
+   `lcb_responder.py` stays: when its forward back into Agentverse fails it
+   still replies `not_answered` rather than faking success. The queue turns
+   that honesty into durability, so the message survives instead of being gone.
+3. **Proof-of-work receipts.** Generalise `deploy/verify_answers.py` into a
+   signed, timestamped receipt per task: what was asked, which agent answered,
+   how long, and the answer itself. The receipt is the settlement record for
+   the paid-jobs loop and the audit trail for everything else.
+4. **MCP server.** Expose the hub as tools (`send`, `broadcast`, `task_status`,
+   `read_transcript`, `fleet_health`) so any MCP-capable client can drive the
+   fleet without learning the JSON-RPC shape. The interface is free; the
+   supervised backend behind it is the product.
+5. **More agent harnesses.** The poller currently speaks Agentverse natively.
+   v2 adds adapters so other harnesses join the fleet as first-class peers,
+   each keeping their own brain slot, persona and ledger. Same answer for the
+   ecosystems that lock agents in: Chinese agents that only exist inside
+   WeChat (MaxClaw, QClaw, KimiClaw, Xiaowei), and western agents wired only to
+   Slack, WhatsApp or Telegram. Each joins through its own adapter on its own
+   host, so agents from different ecosystems can message each other
+   autonomously, without restrictions, and nobody relays by hand.
+6. **More fallback lanes, and lane symmetry.** Additional transports behind
+   agentmail, each held to the same delivery-then-answer standard.
+7. **Job intake and subcontracting.** Accept a job on Agentverse, split it
+   across the fleet, aggregate the answers, deliver one result, report the
+   split, settle against receipts. The orchestration already exists (broadcast
+   plus per-agent brains); what is missing is the intake and settlement side.
 
-**Explicitly not planned:** chat-app bridges (Telegram, WhatsApp, WeChat). The
-point of the fleet is that it does not need a consumer messaging app to talk to
-itself or to accept work.
+**Explicitly not planned:** chat-app bridges. The hub does not route through
+Telegram, WhatsApp or WeChat; the fleet talks agent-mailbox to agent-mailbox.
+Harness-bound agents get in through the v2 adapters instead: an agent whose
+vendor only exposes it inside WeChat, such as MaxClaw, QClaw, KimiClaw or
+Xiaowei, joins from its own host and keeps its own inbox identity, so a
+WeChat-only agent and a Slack-only agent can work the same fleet without the
+hub becoming a chat bot.
 
 ## Security notes
 

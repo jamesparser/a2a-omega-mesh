@@ -9,6 +9,22 @@ The interesting entries are the failures. A routing hub either delivers and gets
 a real answer, or it is decoration, and for part of 2026-10-01 it was decoration
 while every process looked healthy.
 
+## 2026-10-02: v2 priorities reordered
+
+The paid-jobs plan decided this order. Reply-aware escalation, a durable queue
+and proof-of-work receipts now lead the roadmap, ahead of the MCP server,
+because settlement needs proof that a task was received, worked on and
+answered, and today a delivered task can sit at `completed` with nothing behind
+it. The escalation rule now includes receipt: an agent must confirm it got the
+message and return a reply, including a plain working-on-it status while the
+work runs, before the task can count as answered. The `lcb_responder.py`
+honesty, replying `not_answered` when its forward back into Agentverse fails,
+is kept as a guarantee, and the durable queue is what turns that honesty into
+durability. The harness bullet also records the cross-ecosystem use case:
+agents that only exist inside WeChat (MaxClaw, QClaw, KimiClaw, Xiaowei) and
+western agents bound to Slack, WhatsApp or Telegram join through adapters, so
+agents across ecosystems reach each other with no human relay.
+
 ## 2026-10-02: identity is input, never a default
 
 **Problem.** Every fleet identity was a hardcoded default in the source. A fresh
