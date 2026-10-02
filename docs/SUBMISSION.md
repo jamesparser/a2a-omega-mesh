@@ -39,8 +39,9 @@ form doubles as the project proposal. **One claim per team.** Text to paste:
 | Reproducible metrics | done - `results/mesh-2026-09-25.json`, 60/60 deliveries (30 pairs x 2 transports) |
 | Deployment URL **or** reproducible metrics | metrics satisfied; a live URL is still missing |
 | Featured image | `docs/featured.png` (uploaded to HackerNoon CDN as `images/img-5p03rto.png`) |
-| Demo | **cut ready** - `assets/a2a-omega-demo-46s.mp4` (40s BGI live exchange + 6s daily transcript still). Hub stays private (127.0.0.1/Tailscale). Sources: trimmed BGI clip + `assets/daily-transcript-email-still.png`. |
-| HackerNoon post | **submitted 2026-09-27 13:25, in editorial review (not public yet)** - draft id `6ab88985db16a69b1ffa3433`, author `@jasonparser`. Canonical text is `docs/ARTICLE.md` (synced back from the editor) |
+| Demo | **ready** - `assets/a2a-omega-demo-narrated.mp4` (30s, live Tailscale hub session + voiceover) and `assets/a2a-omega-demo-full.mp4` (55s, title/body/end). Hub stays private (127.0.0.1/Tailscale). |
+| HackerNoon post | **still in editorial review as of 2026-10-02.** Writer tracker: "Stories in Editorial", submitted 5 days ago, not published, not rejected. Project submit at decentralizeai.tech waits on the live URL. |
+| Live fleet check | **passed 2026-10-02.** Hub 100.106.162.70:8787 over Tailscale: healthz ok, 9 peers, protocol 0.3.0. SendMessage delivered. Agents answering real audit questions. |
 
 ## Blockers - owner only
 
