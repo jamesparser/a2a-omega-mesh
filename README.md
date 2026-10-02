@@ -17,10 +17,17 @@ omega          ├──► [ hub ] ──► any peer, over whichever transport
 liberclaw ─────┘                + a daily transcript to you
 ```
 
-> Fork of my own [`jamesparser/a2a-omega`](https://github.com/jamesparser/a2a-omega)
-> (BGI Commons HyperSprint #2, team 58 — JasonParser Security). This copy is
-> packaged for the [Decentralize AI Hackathon](https://decentralizeai.tech) by
-> HackerNoon, Nosana, Arweave and MEXC.
+> **This is the active repo.** Development continues here and nowhere else.
+> [`jamesparser/a2a-omega`](https://github.com/jamesparser/a2a-omega) is the
+> original (BGI Commons HyperSprint #2, team 58, JasonParser Security). It is
+> frozen and kept for history; its answering-loop fixes were ported into this
+> repo on 2026-10-02 and are not going back.
+>
+> Packaged for the [Decentralize AI Hackathon](https://decentralizeai.tech) by
+> HackerNoon, Nosana, Arweave and MEXC. Round 1 is this repo as it stands;
+> [`## Roadmap: v2`](#roadmap-v2) is the Round 2 entry.
+>
+> Dated history of what broke and what fixed it: [`CHANGELOG.md`](CHANGELOG.md).
 
 ---
 
@@ -125,6 +132,40 @@ identity has no mailbox, so every agent that tries to answer a hub-sent task
 gets `404 Target agent not found` and the answer is silently lost. The poller
 defends against this too: on a 404 it redirects the answer to
 `A2A_REPLY_FALLBACK` (default `jason-parser`) instead of dropping it.
+
+## Before you install: your identities, not ours
+
+Running this repo does **not** connect you to the maintainer's agents, and it
+cannot send prompts to them. Nothing here defaults to a real fleet.
+
+Earlier revisions did, and that was a genuine defect, not a style choice. A
+fresh clone would:
+
+- sign Agentverse envelopes with the maintainer's registered seed, so its tasks
+  arrived looking like they came from someone else's agent, and the replies to
+  them landed in the maintainer's mailbox instead of yours;
+- redirect every undeliverable answer into the maintainer's mailbox;
+- mail fallback-lane status reports to the maintainer's AgentMail inbox;
+- start a poller for an agent name it did not own, competing for that mailbox.
+
+All of that is gone. The current behaviour:
+
+| Setting | Default now | If you leave it unset |
+|---|---|---|
+| `A2A_HUB_IDENTITY` / `A2A_SEED_PREFIX` | none | `av_send` refuses to sign and returns an error explaining what to set |
+| `A2A_OWN_AGENTS` | none | `omega_poller.py` exits 2 and tells you to name your own agents |
+| `A2A_FLEET` | `agent-one,agent-two,agent-three` | broadcast only reaches placeholder names that resolve to nothing |
+| `A2A_REPLY_FALLBACK` | none | redirection disabled; an answer to an unregistered sender is dropped loudly in the log, not mailed to a stranger |
+| `LCB_REPLY_TO` | none | fallback-lane statuses are logged, not mailed |
+| `A2A_HUB_SENDER_E2A` | none | the e2a lane has no sender and will not transmit |
+
+Copy [`config/fleet.env.example`](config/fleet.env.example) to
+`notes/fleet.env` and fill in your own agents. That path is gitignored, so your
+identities stay local. Both `deploy/run_poller_one.sh` and
+`deploy/omega_poller_keeper.sh` source it automatically.
+
+The rule this enforces: **identity is input, never a default.** A routing hub
+that guesses who you are will eventually speak as someone else.
 
 ## Quick start
 
@@ -272,6 +313,41 @@ python3 test_a2a_hub.py             # transport chain agentverse -> e2a -> agent
 python3 deploy/test_lcb_responder.py  # AgentMail fallback lane, single-instance lock
 ```
 
+## Roadmap: v2
+
+Round 1 of the Decentralize AI Hackathon is this repo as it stands. The same
+project can be resubmitted into **Round 2 (Nov 2026 to Feb 2027)** with more
+built, so v2 is planned against that window.
+
+**Planned for v2:**
+
+- **MCP server.** Expose the hub as tools (`send`, `broadcast`, `task_status`,
+  `read_transcript`, `fleet_health`) so any MCP-capable client can drive the
+  fleet without learning the JSON-RPC shape. The interface is free; the
+  supervised backend behind it is the product.
+- **Reply-aware escalation.** Today the transport chain falls back on *send*
+  failure only. v2 adds a delivery-then-answer state machine: a task that was
+  delivered but never answered escalates to the next lane or back to the
+  operator instead of sitting at `completed` forever. This is the blocker for
+  paid work, because you cannot bill for a task you cannot prove was answered.
+- **More agent harnesses.** The poller currently speaks Agentverse natively.
+  v2 adds adapters so other harnesses join the fleet as first-class peers,
+  each keeping their own brain slot, persona and ledger.
+- **More fallback lanes, and lane symmetry.** Additional transports behind
+  agentmail, plus a durable outbound queue so a lane outage parks messages and
+  drains them on recovery rather than reporting `not_answered` and moving on.
+- **Proof of work.** Generalise `deploy/verify_answers.py` into a signed,
+  timestamped receipt per task: what was asked, which agent answered, how long,
+  and the answer itself. Needed for the paid-jobs loop and for audit.
+- **Job intake and subcontracting.** Accept a job on Agentverse, split it across
+  the fleet, aggregate the answers, deliver one result, report the split. The
+  orchestration already exists (broadcast plus per-agent brains); what is
+  missing is the intake and settlement side.
+
+**Explicitly not planned:** chat-app bridges (Telegram, WhatsApp, WeChat). The
+point of the fleet is that it does not need a consumer messaging app to talk to
+itself or to accept work.
+
 ## Security notes
 
 Read these before running it anywhere.
@@ -304,12 +380,14 @@ mesh_test.py               NxN delivery test across transports, optional JSON ou
 poller.py                  watch inboxes, forward notable mail to the owner
 config/peers.example.json  peer registry template (placeholders)
 config/README.md             which fields each transport actually needs
+config/fleet.env.example    template for your local, gitignored fleet identity
 omega_poller.py             per-agent answering loop: own brain slot, persona, ledger
 test_omega_poller.py        regression tests for the answering loop and its failure modes
 test_a2a_hub.py             transport chain tests (agentverse -> e2a -> agentmail)
 deploy/                     supervision: keeper script, systemd unit, responder, verifier
 results/                   committed mesh run output
 docs/SUBMISSION.md         hackathon packaging + what's left to do
+CHANGELOG.md               dated revision timeline: what broke, what fixed it
 ```
 
 ## License
