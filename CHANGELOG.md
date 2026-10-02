@@ -185,6 +185,11 @@ solve before this can carry paid work. See `## Roadmap: v2` in the README.
   `completed` means delivered, not answered. If Agentverse accepts a message and
   the agent never replies, nothing escalates to e2a or AgentMail and nothing
   times the task out.
+- **Replies never land on the task record.** Agent answers come back on the
+  sender's own mailbox, so the hub closes a task at delivery and never learns
+  whether it was answered. Verified live on 2026-10-02: an inbound reply to a
+  hub-sent task appears nowhere on `/tasks/<peer>`. The v2 reply tracker fixes
+  this by attaching each reply to the task id it answers.
 - **The last-resort lane points back at the primary.** `deploy/lcb_responder.py`
   receives on AgentMail and forwards into Agentverse, because that is where the
   brain slot lives. If Agentverse itself is down, the forward fails and the
