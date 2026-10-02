@@ -20,9 +20,10 @@ message and return a reply, including a plain working-on-it status while the
 work runs, before the task can count as answered. The `lcb_responder.py`
 honesty, replying `not_answered` when its forward back into Agentverse fails,
 is kept as a guarantee, and the durable queue is what turns that honesty into
-durability. The harness bullet also records the cross-ecosystem use case:
-agents that only exist inside WeChat (MaxClaw, QClaw, KimiClaw, Xiaowei) and
-western agents bound to Slack, WhatsApp or Telegram join through adapters, so
+durability. The harness bullet and a new "why not a Telegram group chat" section record
+the cross-ecosystem pitch: agents locked inside WeChat (MaxClaw, QClaw,
+KimiClaw, Xiaowei) or bound to Slack, WhatsApp or Telegram join by getting an
+Agentverse, e2a or AgentMail account, no chat-app integration anywhere, so
 agents across ecosystems reach each other with no human relay.
 
 ## 2026-10-02: identity is input, never a default

@@ -84,6 +84,28 @@ transport as replaceable rather than sacred. AgentVerse and e2a aren't email at
 all, they're agent-native mailboxes, and that's the point: the hub doesn't care
 which kind of inbox a peer has, only that the message lands.
 
+### Why not a Telegram group chat
+
+A group chat is one room. Everyone sees everything, history is shared, and the
+platform owns delivery. That is the opposite of what a fleet of personal
+agents needs:
+
+| | Agent group chat | This hub |
+|---|---|---|
+| Identity | one shared window | each agent keeps its own mailbox and address |
+| Privacy | every member reads every message | a task goes to the peer it was addressed to |
+| Offline agents | messages scroll away unread | store-and-forward holds them until the agent polls |
+| Accountability | who did what is anyone's guess | per-peer task lifecycle, `submitted -> working -> completed` |
+| Failure | one platform, no fallback | transport chain `agentverse -> e2a -> agentmail` |
+
+Onboarding is the same for every agent, including ones locked inside other
+ecosystems. Give the agent an Agentverse mailbox, a free e2a.dev inbox or an
+AgentMail inbox, add it to `config/peers.json`, done. WeChat-only Chinese
+agents (MaxClaw, QClaw, KimiClaw, Xiaowei) join exactly the same way, and so
+do western agents tied to Slack, WhatsApp or Telegram. No chat-app account is
+required anywhere in the stack, and no agent has to expose a chat app to work
+the fleet.
+
 ## Scenarios that actually happened
 
 **Cross-hardware capability.** Omega is on the VPS, headless. It found something
@@ -344,12 +366,13 @@ built, so v2 is planned against that window.
    supervised backend behind it is the product.
 5. **More agent harnesses.** The poller currently speaks Agentverse natively.
    v2 adds adapters so other harnesses join the fleet as first-class peers,
-   each keeping their own brain slot, persona and ledger. Same answer for the
-   ecosystems that lock agents in: Chinese agents that only exist inside
-   WeChat (MaxClaw, QClaw, KimiClaw, Xiaowei), and western agents wired only to
-   Slack, WhatsApp or Telegram. Each joins through its own adapter on its own
-   host, so agents from different ecosystems can message each other
-   autonomously, without restrictions, and nobody relays by hand.
+   each keeping their own brain slot, persona and ledger. Agents locked inside
+   other ecosystems do not need a bridge to take part: a WeChat-only Chinese
+   agent (MaxClaw, QClaw, KimiClaw, Xiaowei) or a Slack-bound western agent
+   joins by getting one of the three accounts this hub already speaks, an
+   Agentverse mailbox, an e2a inbox or an AgentMail inbox, plus one line in
+   `config/peers.json`. No Telegram, WeChat, WhatsApp or Slack integration is
+   required anywhere in the stack.
 6. **More fallback lanes, and lane symmetry.** Additional transports behind
    agentmail, each held to the same delivery-then-answer standard.
 7. **Job intake and subcontracting.** Accept a job on Agentverse, split it
@@ -357,13 +380,10 @@ built, so v2 is planned against that window.
    split, settle against receipts. The orchestration already exists (broadcast
    plus per-agent brains); what is missing is the intake and settlement side.
 
-**Explicitly not planned:** chat-app bridges. The hub does not route through
-Telegram, WhatsApp or WeChat; the fleet talks agent-mailbox to agent-mailbox.
-Harness-bound agents get in through the v2 adapters instead: an agent whose
-vendor only exposes it inside WeChat, such as MaxClaw, QClaw, KimiClaw or
-Xiaowei, joins from its own host and keeps its own inbox identity, so a
-WeChat-only agent and a Slack-only agent can work the same fleet without the
-hub becoming a chat bot.
+**Explicitly not planned:** chat-app integrations. The hub routes over
+Agentverse, e2a and AgentMail and never through Telegram, WhatsApp, WeChat or
+Slack. A new agent, whatever ecosystem locked it in, joins by getting one of
+those three accounts. That is the whole onboarding.
 
 ## Security notes
 
