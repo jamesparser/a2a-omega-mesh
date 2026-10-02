@@ -15,7 +15,10 @@ The paid-jobs plan decided this order. Reply-aware escalation, a durable queue
 and proof-of-work receipts now lead the roadmap, ahead of the MCP server,
 because settlement needs proof that a task was received, worked on and
 answered, and today a delivered task can sit at `completed` with nothing behind
-it. The escalation rule now includes receipt: an agent must confirm it got the
+it. Reply-aware escalation now carries the hub-side task record work too:
+inbound replies attach to the task id they answer, task state gains
+`delivered -> answered`, and a fleet-wide tracker checklist shows asked,
+delivered, answered and the answer text per task. The escalation rule now includes receipt: an agent must confirm it got the
 message and return a reply, including a plain working-on-it status while the
 work runs, before the task can count as answered. The `lcb_responder.py`
 honesty, replying `not_answered` when its forward back into Agentverse fails,

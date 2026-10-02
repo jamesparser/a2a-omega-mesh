@@ -350,7 +350,13 @@ built, so v2 is planned against that window.
    A task that was delivered but never answered escalates to the next lane or
    back to the operator instead of sitting at `completed` forever. This is the
    blocker for paid work, because you cannot bill for a task you cannot prove
-   was answered.
+   was answered. The hub side is the missing half: replies currently come back
+   on the sender's own mailbox and never touch the hub's task record. v2
+   attaches every inbound reply to the task id it answers, so a task reads
+   `submitted -> working -> delivered -> answered` with the reply stored on the
+   record, plus a fleet-wide tracker: one checklist row per task showing what
+   was asked, was it delivered, was it answered, and the answer text.
+2. **Durable queue.**
 2. **Durable queue.** A lane outage parks outbound messages and drains them on
    recovery instead of reporting failure and moving on. The honesty of
    `lcb_responder.py` stays: when its forward back into Agentverse fails it
