@@ -19,11 +19,10 @@ liberclaw ─────┘                + a daily transcript to you
 
 > **This is the active repo.** Development continues here and nowhere else.
 > [`jamesparser/a2a-omega`](https://github.com/jamesparser/a2a-omega) is the
-> original (BGI Commons HyperSprint #2, team 58, JasonParser Security). It is
-> frozen and kept for history; its answering-loop fixes were ported into this
-> repo on 2026-10-02 and are not going back.
+> earlier build. It is frozen and kept for history; its answering-loop fixes
+> were ported into this repo on 2026-10-02 and are not going back.
 >
-> Packaged for the [Decentralize AI Hackathon](https://decentralizeai.tech) by
+> Built for the [Decentralize AI Hackathon](https://decentralizeai.tech) by
 > HackerNoon, Nosana, Arweave and MEXC. Round 1 is this repo as it stands;
 > [`## Roadmap: v2`](#roadmap-v2) is the Round 2 entry.
 >

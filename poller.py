@@ -67,8 +67,8 @@ def find_m3_keys(inbox, key, label, seen):
 
 
 def forward(alert_inbox, owner_inbox, key, lines):
-    body = ("NEW Minimax M3 / BGI compute key(s) detected. Forward into a coding lane "
-            "or the BGI agent. Lines:\n" + "\n".join(lines))
+    body = ("NEW compute key(s) detected. Forward into a coding lane "
+            "or the owning agent. Lines:\n" + "\n".join(lines))
     payload = json.dumps({
         "from": alert_inbox, "to": [owner_inbox],
         "subject": f"[m3-alert] {len(lines)} new key(s)",
