@@ -98,6 +98,34 @@ message asking for some. The hub treats an inbound message from a peer like any
 other task. This is the bit that felt like magic the first time: the queue started
 feeding itself.
 
+## Transport precedence
+
+`A2A_TRANSPORT` picks the primary (default `agentverse`). The hub always falls
+back through the same canonical order, so a missing key or SDK never blocks
+routing:
+
+1. **Agentverse**: `POST https://agentverse.ai/v2/agents/mailbox/submit` (signed Envelope, Bearer JWT)
+2. **e2a**: `POST https://api.e2a.dev/v1/agents/{from}/messages` with `{"to":[...],"subject","text"}`
+3. **AgentMail**: last resort, per-peer `inbox` + `agent_mail_key`
+
+A transport the peer cannot use is dropped (no `agentverse_address` / no
+`e2a_email` / no `agent_mail_key`); the order of the rest is preserved.
+MailSlurp was removed as a 4th fallback on 2026-09-25, because e2a and Agentverse both
+passed the full 6-agent mesh, so the extra hop only added an unused
+sandbox-inbox dependency.
+
+e2a needs a browser-like `User-Agent` (Cloudflare 1010 otherwise). Peers carry `e2a_email` + `agentverse_address` in `config/peers.json`.
+
+### The hub must sign as a registered identity
+
+`a2a_agentverse.py` signs outbound envelopes with `A2A_AGENTVERSE_SEED`, which
+defaults to `A2A_SEED_PREFIX + A2A_HUB_IDENTITY` (= the `jason-parser` fleet
+identity). **Do not point it at an ad-hoc seed.** An unregistered signing
+identity has no mailbox, so every agent that tries to answer a hub-sent task
+gets `404 Target agent not found` and the answer is silently lost. The poller
+defends against this too: on a 404 it redirects the answer to
+`A2A_REPLY_FALLBACK` (default `jason-parser`) instead of dropping it.
+
 ## Quick start
 
 Python 3.9+ (verified compiling on 3.9.6). Standard library only for the email path; `uagents` is needed only
@@ -176,6 +204,52 @@ Optional fleet fan-out:
 python a2a_client.py broadcast "status note for everyone"
 ```
 
+### The answering loop: `omega_poller.py`
+
+One process per agent, each with its own brain slot, persona and ledger:
+
+```bash
+A2A_AGENTVERSE_ENV=/path/agentverse.env \
+A2A_OWN_AGENTS=omega-man \
+A2A_ANSWER_BASE=http://127.0.0.1:4000/v1 \
+A2A_ANSWER_KEY=... A2A_ANSWER_MODEL=... \
+python3 omega_poller.py __actor=omega-man
+```
+
+Every `[a2a]` message gets a real answer:
+
+| Message | How it is answered |
+|---|---|
+| status-shaped (`working on`, `queue`, `need work`) | from that agent's **own ledger**, so it is grounded and cannot confabulate |
+| anything else | through that agent's **own brain slot**, with its persona + live ledger injected as context, so it answers as itself |
+| `start your top task` directive | pulls the top of its own queue into `active` and confirms it (closed loop) |
+| brain unreachable | says so explicitly; it does **not** invent an answer |
+
+**One process per agent, always.** `__actor=<name>` narrows a process to a
+single agent. Running one process with a multi-name `A2A_OWN_AGENTS` *alongside*
+per-actor processes puts two pollers on every mailbox, racing on the same
+`.av_seen_<agent>.json`, which duplicates answers and can resurrect an envelope
+the other process already handled.
+
+A message that cannot be delivered is retried up to `A2A_MAX_ATTEMPTS` (default
+3) and then dropped loudly, so one bad envelope can never block a mailbox.
+Per-message exceptions are isolated and the dedupe state is persisted in a
+`finally` block.
+
+### Supervision: `deploy/`
+
+`deploy/omega_poller_keeper.sh` + `deploy/omega-a2a-poller.service` run one actor
+per agent under systemd: they start missing actors, **kill duplicate and legacy
+catch-all pollers**, and self-heal the uagents SDK after a container recreate.
+`deploy/README.md` covers topology and install; `deploy/status-check.ps1` is a
+read-only health check for the Windows side.
+
+Verify the fleet actually answers end to end:
+
+```bash
+python3 deploy/verify_answers.py --wait 90      # 6/6 REAL ANSWER expected
+```
+
 ## Does it work
 
 Yes, on a six-agent fleet. `mesh_test.py` walks every ordered pair (30 of them)
@@ -189,6 +263,14 @@ on both transports), zero failures. Machine-readable result in
 The property under test is **delivery**, not responsiveness: can agent A get a task
 to agent B when B is not currently listening. That is the thing that makes a fleet
 of personal agents usable.
+
+## Tests
+
+```bash
+python3 test_omega_poller.py        # answering loop, retry bounds, 404 redirect, actor scoping
+python3 test_a2a_hub.py             # transport chain agentverse -> e2a -> agentmail
+python3 deploy/test_lcb_responder.py  # AgentMail fallback lane, single-instance lock
+```
 
 ## Security notes
 
@@ -222,6 +304,10 @@ mesh_test.py               NxN delivery test across transports, optional JSON ou
 poller.py                  watch inboxes, forward notable mail to the owner
 config/peers.example.json  peer registry template (placeholders)
 config/README.md             which fields each transport actually needs
+omega_poller.py             per-agent answering loop: own brain slot, persona, ledger
+test_omega_poller.py        regression tests for the answering loop and its failure modes
+test_a2a_hub.py             transport chain tests (agentverse -> e2a -> agentmail)
+deploy/                     supervision: keeper script, systemd unit, responder, verifier
 results/                   committed mesh run output
 docs/SUBMISSION.md         hackathon packaging + what's left to do
 ```
