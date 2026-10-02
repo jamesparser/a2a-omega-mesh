@@ -2,8 +2,8 @@
 
 **Your AI agents don't need you anymore.**
 
-A self-hosted routing hub that lets the agents you run talk to each other — send
-work, ask for a second opinion, report that they're finished — without you
+A self-hosted routing hub that lets the agents you run talk to each other: send
+work, ask for a second opinion, report that they're finished, without you
 copy-pasting between them.
 
 It speaks an A2A-shaped JSON-RPC interface and delivers over several transports:
@@ -40,10 +40,10 @@ browser, one is mostly a code reader.
 They were useless to each other.
 
 Every handoff went through me. *Omega found something and wants a second pair of
-eyes on the diff* — so I pasted the diff into another terminal. *Liberclaw
-finished the task* — so I checked on it, then told Omega. *Betterclaw is idle and
-wants work* — so I remembered to ask. *Omega needs something posted from a
-logged-in browser, and it is on a headless box with no browser* — so I did the
+eyes on the diff*, so I pasted the diff into another terminal. *Liberclaw
+finished the task*, so I checked on it, then told Omega. *Betterclaw is idle and
+wants work*, so I remembered to ask. *Omega needs something posted from a
+logged-in browser, and it is on a headless box with no browser*, so I did the
 browser part myself, at 1am, acting as the network cable between two programs I
 own.
 
@@ -69,7 +69,7 @@ sends a task to Betterclaw and gets a reply, and I read a summary in the morning
 ## What it is not
 
 It is not a replacement for [Linux Foundation A2A](https://a2a-protocol.org). The
-hub deliberately mimics the A2A shape — agent card, `SendMessage`, task methods —
+hub deliberately mimics the A2A shape: agent card, `SendMessage`, task methods,
 so an A2A client can talk to it. Where it differs is the assumption about who the
 agents are.
 
@@ -81,7 +81,7 @@ the message to still arrive at 4am when nobody is listening.
 
 Email solved that problem in 1971. This uses it again, on purpose, and treats the
 transport as replaceable rather than sacred. AgentVerse and e2a aren't email at
-all — they're agent-native mailboxes — and that's the point: the hub doesn't care
+all, they're agent-native mailboxes, and that's the point: the hub doesn't care
 which kind of inbox a peer has, only that the message lands.
 
 ## Scenarios that actually happened
@@ -97,7 +97,7 @@ The reply comes back with the case that breaks the PoC. Two agents, one false
 positive removed, no human in the relay.
 
 **Chasing a job.** I want to know whether Liberclaw finished. I don't query a
-database or open a terminal — the hub keeps a task record per peer, and the peer
+database or open a terminal: the hub keeps a task record per peer, and the peer
 answers on its own schedule.
 
 **An idle worker asking for work.** Betterclaw has nothing to do, so it sends a
@@ -197,7 +197,7 @@ Have an agent drain its own mailbox and reply:
 A2A_ME_INBOX=betterclaw@example.com A2A_HUB=http://100.x.y.z:8787 python a2a_client.py poll
 ```
 
-Check the whole fleet at once — every ordered pair, on every transport you have
+Check the whole fleet at once: every ordered pair, on every transport you have
 configured:
 
 ```bash
@@ -378,7 +378,7 @@ Read these before running it anywhere.
   the committed `peers.example.json` uses obviously fake placeholders.
 - **Transcripts contain your agents' words.** If a peer pastes an API key into a
   message, the daily transcript will happily mail it to you. Redact before
-  publishing — every example in this repo and in the write-up is rewritten, not
+  publishing: every example in this repo and in the write-up is rewritten, not
   raw.
 - **Email is not a confidential channel.** These transports give you delivery and
   provenance, not secrecy. Encrypt the payload if the content matters.
@@ -409,7 +409,7 @@ CHANGELOG.md               dated revision timeline: what broke, what fixed it
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT, see [LICENSE](LICENSE).
 
 *(The original repo's README said GPL-3.0 while its LICENSE file said MIT. Matched
 to LICENSE here. If GPL was intended, change both.)*
