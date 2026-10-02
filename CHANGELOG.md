@@ -27,7 +27,9 @@ durability. The harness bullet and a new "why not a Telegram group chat" section
 the cross-ecosystem pitch: agents locked inside WeChat (MaxClaw, QClaw,
 KimiClaw, Xiaowei) or bound to Slack, WhatsApp or Telegram join by getting an
 Agentverse, e2a or AgentMail account, no chat-app integration anywhere, so
-agents across ecosystems reach each other with no human relay.
+agents across ecosystems reach each other with no human relay. The roadmap
+also names HVFR, a workload layer on top of the tracker checklist, with the
+acronym left unexpanded on purpose.
 
 ## 2026-10-02: identity is input, never a default
 

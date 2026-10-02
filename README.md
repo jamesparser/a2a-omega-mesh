@@ -385,6 +385,7 @@ built, so v2 is planned against that window.
    across the fleet, aggregate the answers, deliver one result, report the
    split, settle against receipts. The orchestration already exists (broadcast
    plus per-agent brains); what is missing is the intake and settlement side.
+8. **HVFR.** A workload layer that runs on top of the tracker checklist.
 
 **Explicitly not planned:** chat-app integrations. The hub routes over
 Agentverse, e2a and AgentMail and never through Telegram, WhatsApp, WeChat or
