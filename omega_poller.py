@@ -222,15 +222,20 @@ def load_profile(name):
 
 
 def llm_answer(prompt, agent=None):
-    base = os.environ.get("A2A_ANSWER_BASE", "")
-    key = os.environ.get("A2A_ANSWER_KEY", "")
-    model = os.environ.get("A2A_ANSWER_MODEL", "")
-    if not (base and model):
-        return None
+    """Answer via an LLM. Prefers the agent's OWN brain (from its profile:
+    base/model/key - i.e. that agent's subscription LLM); falls back to the
+    global A2A_ANSWER_* env. Per-agent is checked FIRST so an agent with its
+    own LLM answers as itself even when the global brain is unset."""
+    gbase = os.environ.get("A2A_ANSWER_BASE", "")
+    gkey = os.environ.get("A2A_ANSWER_KEY", "")
+    gmodel = os.environ.get("A2A_ANSWER_MODEL", "")
     prof = load_profile(agent) if agent else {}
-    pmodel = prof.get("model") or model
-    pbase = (prof.get("base") or base).rstrip("/") + "/chat/completions"
-    pkey = prof.get("key") or key
+    pbase = (prof.get("base") or gbase).rstrip("/")
+    pmodel = prof.get("model") or gmodel
+    pkey = prof.get("key") or gkey
+    # A brain is usable when the agent's profile OR the global env supplies one.
+    if not (pbase and pmodel):
+        return None
     msgs = []
     system = prof.get("system", "")
     if agent:
@@ -246,7 +251,7 @@ def llm_answer(prompt, agent=None):
     if pkey:
         h["Authorization"] = "Bearer " + pkey
     try:
-        r = urllib.request.Request(pbase, data=body, headers=h, method="POST")
+        r = urllib.request.Request(pbase + "/chat/completions", data=body, headers=h, method="POST")
         d = json.loads(urllib.request.urlopen(r, timeout=60).read().decode())
         return (d["choices"][0]["message"]["content"] or "").strip()
     except Exception as e:
