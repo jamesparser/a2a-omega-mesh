@@ -182,8 +182,8 @@ All of that is gone. The current behaviour:
 
 Copy [`config/fleet.env.example`](config/fleet.env.example) to
 `notes/fleet.env` and fill in your own agents. That path is gitignored, so your
-identities stay local. Both `deploy/run_poller_one.sh` and
-`deploy/omega_poller_keeper.sh` source it automatically.
+identities stay local. Both `deploy/run_fleet_poller_one.sh` and
+`deploy/omega_fleet_poller_keeper.sh` source it automatically.
 
 The rule this enforces: **identity is input, never a default.** A routing hub
 that guesses who you are will eventually speak as someone else.
@@ -266,32 +266,48 @@ Optional fleet fan-out:
 python a2a_client.py broadcast "status note for everyone"
 ```
 
-### The answering loop: `omega_poller.py`
+### The answering loop: `a2a_fleet_poller.py` (unified, since 2026-10-04)
 
-One process per agent, each with its own brain slot, persona and ledger:
+One actor process per agent. Each actor reads **all three inbound lanes** at
+once and answers from one code path:
+
+```
+Agentverse mailbox  (persistent retry through 503 / DNS flaps)
+AgentMail inbox     (unlimited, cross-account -> the guaranteed reply lane)
+e2a inbox           (read-only on the free tier)
+```
+
+Replies go **AgentMail primary, Agentverse best-effort**; e2a is never a send
+lane. One actor per agent, supervised by a single keeper:
 
 ```bash
 A2A_AGENTVERSE_ENV=/path/agentverse.env \
+A2A_AGENTMAIL_KEYS=/path/agentmail_keys.json \
+A2A_E2A_KEY_FILES=/path/e2a.env,./e2a2.env \
 A2A_OWN_AGENTS=omega-man \
 A2A_ANSWER_BASE=http://127.0.0.1:4000/v1 \
 A2A_ANSWER_KEY=... A2A_ANSWER_MODEL=... \
-python3 omega_poller.py __actor=omega-man
+python3 a2a_fleet_poller.py __actor=omega-man
 ```
+
+(`omega_poller.py` remains the Agentverse brain/ledger pipeline the fleet
+poller builds on; `legacy/` holds the retired per-transport pollers.)
 
 Every `[a2a]` message gets a real answer:
 
 | Message | How it is answered |
 |---|---|
-| status-shaped (`working on`, `queue`, `need work`) | from that agent's **own ledger**, so it is grounded and cannot confabulate |
-| anything else | through that agent's **own brain slot**, with its persona + live ledger injected as context, so it answers as itself |
+| status-shaped (`working on`, `queue`, `need work`) | from that agent's **own ledger** (`A2A_LEDGER_DIR`), so it is grounded and cannot confabulate |
+| anything else | through that agent's **own brain slot** (`A2A_ANSWER_*`, overridable per agent via `A2A_ANSWER_PROFILES`), with its persona + live ledger injected as context, so it answers as itself |
 | `start your top task` directive | pulls the top of its own queue into `active` and confirms it (closed loop) |
 | brain unreachable | says so explicitly; it does **not** invent an answer |
 
 **One process per agent, always.** `__actor=<name>` narrows a process to a
-single agent. Running one process with a multi-name `A2A_OWN_AGENTS` *alongside*
-per-actor processes puts two pollers on every mailbox, racing on the same
-`.av_seen_<agent>.json`, which duplicates answers and can resurrect an envelope
-the other process already handled.
+single agent. Running one process with a multi-name `A2A_OWN_AGENTS`
+*alongside* per-actor processes puts two pollers on every mailbox, racing on
+the same `.av_seen_<agent>.json`, which duplicates answers and can resurrect
+an envelope the other process already handled. The keeper kills any poller
+that lacks `__actor=`.
 
 A message that cannot be delivered is retried up to `A2A_MAX_ATTEMPTS` (default
 3) and then dropped loudly, so one bad envelope can never block a mailbox.
@@ -300,16 +316,16 @@ Per-message exceptions are isolated and the dedupe state is persisted in a
 
 ### Supervision: `deploy/`
 
-`deploy/omega_poller_keeper.sh` + `deploy/omega-a2a-poller.service` run one actor
-per agent under systemd: they start missing actors, **kill duplicate and legacy
-catch-all pollers**, and self-heal the uagents SDK after a container recreate.
-`deploy/README.md` covers topology and install; `deploy/status-check.ps1` is a
-read-only health check for the Windows side.
+`deploy/omega_fleet_poller_keeper.sh` + `deploy/omega-fleet-poller.service`
+run one actor per agent under systemd: they start missing actors within ~10s,
+**kill duplicate and legacy catch-all pollers**, and self-heal the uagents SDK
+after a container recreate. `deploy/README.md` covers topology and install.
 
 Verify the fleet actually answers end to end:
 
 ```bash
-python3 deploy/verify_answers.py --wait 90      # 6/6 REAL ANSWER expected
+python3 mesh_omega_check.py      # did a reply to a given agent land in its inbox
+python3 verify_subjroute.py      # reply subject routing, end to end
 ```
 
 ## Does it work
@@ -331,7 +347,8 @@ of personal agents usable.
 ```bash
 python3 test_omega_poller.py        # answering loop, retry bounds, 404 redirect, actor scoping
 python3 test_a2a_hub.py             # transport chain agentverse -> e2a -> agentmail
-python3 deploy/test_lcb_responder.py  # AgentMail fallback lane, single-instance lock
+python3 mesh_omega_check.py         # reply-to-agent landed in its inbox (unified poller)
+python3 verify_subjroute.py         # reply subject routing end to end
 ```
 
 ## Roadmap: v2
@@ -419,15 +436,22 @@ a2a_hub.py                 routing server: A2A-shaped RPC, transports, transcrip
 a2a_client.py              one agent: poll its inbox, send to peers
 a2a_agentverse.py          AgentVerse mailbox transport (uagents, signed envelopes)
 a2a_e2a.py                 e2a.dev inbox transport
+a2a_fleet_poller.py        UNIFIED fleet poller: one actor per agent, reads all
+                           three lanes (agentverse + agentmail + e2a), replies
+                           AgentMail-primary
+omega_poller.py            Agentverse brain/ledger answer pipeline the fleet
+                           poller builds on (status -> own ledger, else -> own
+                           brain slot with persona + live ledger as context)
 mesh_test.py               NxN delivery test across transports, optional JSON output
-poller.py                  watch inboxes, forward notable mail to the owner
+mesh_omega_check.py        did a reply to a given agent land in its inbox
+verify_subjroute.py        reply subject routing, end to end
 config/peers.example.json  peer registry template (placeholders)
 config/README.md             which fields each transport actually needs
 config/fleet.env.example    template for your local, gitignored fleet identity
-omega_poller.py             per-agent answering loop: own brain slot, persona, ledger
 test_omega_poller.py        regression tests for the answering loop and its failure modes
 test_a2a_hub.py             transport chain tests (agentverse -> e2a -> agentmail)
-deploy/                     supervision: keeper script, systemd unit, responder, verifier
+deploy/                      unified supervision: keeper + systemd + per-agent launcher
+legacy/                      retired per-transport pollers (reference only, not run)
 results/                   committed mesh run output
 docs/SUBMISSION.md         hackathon packaging + what's left to do
 CHANGELOG.md               dated revision timeline: what broke, what fixed it

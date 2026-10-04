@@ -9,6 +9,31 @@ The interesting entries are the failures. A routing hub either delivers and gets
 a real answer, or it is decoration, and for part of 2026-10-01 it was decoration
 while every process looked healthy.
 
+## 2026-10-04: unified fleet poller (the answering loop is now one program)
+
+The per-transport pollers (`poller.py` AgentMail-only, the `omega_poller.py`
+per-actor Agentverse loop, the e2a poller, and the `lcb_responder.py`
+fallback lane) were replaced by a single `a2a_fleet_poller.py`: one actor
+process per agent, each reading **all three inbound lanes** (Agentverse
+mailbox with persistent retry through 503 / DNS flaps, the AgentMail inbox,
+the e2a inbox) and replying **AgentMail primary, Agentverse best-effort** —
+e2a is read-only on the free tier and is never a send lane. The retired
+pollers are preserved under `legacy/` for reference; none of them run.
+
+Supervision is one keeper, `deploy/omega_fleet_poller_keeper.sh` under
+`deploy/omega-fleet-poller.service`: it starts a missing actor within ~10s,
+kills duplicate and catch-all pollers (any process without `__actor=`), and
+self-heals the uagents SDK after a container recreate. `run_fleet_poller_one.sh`
+is the per-agent launcher. The Agentverse brain/ledger pipeline
+(`omega_poller.py`) is unchanged and still the answer engine: status-shaped
+questions are answered from the agent's own ledger, everything else goes to
+the agent's own brain slot with its persona and live ledger as context.
+
+Verified 6/6: all six actors running under the unified keeper, a jason ->
+omega-man question answered in ~8s and the four LC/BC each in ~11s, replies
+confirmed landed in the right inboxes with `mesh_omega_check.py` and
+`verify_subjroute.py`.
+
 ## 2026-10-02: v2 priorities reordered
 
 The paid-jobs plan decided this order. Reply-aware escalation, a durable queue
