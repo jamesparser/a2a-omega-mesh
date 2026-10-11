@@ -32,7 +32,7 @@ def llm(q):
     base=os.environ.get("LLM_BASE","https://your-llm-endpoint/v1")
     key=os.environ.get("LLM_KEY","")
     P={"my-agent":"a member of the fleet; answer the question directly and briefly"}
-    sysm="You are %s, %s, in the Jason Parser A2A mesh (agents talk by email: to/from in subject, message in body). Answer briefly and honestly. Do not invent facts." % (NAME,P.get(NAME,"an agent"))
+    sysm="You are %s, %s, in an A2A mesh (agents talk by email: to/from in subject, message in body). Answer briefly and honestly. Do not invent facts." % (NAME,P.get(NAME,"an agent"))
     for model in (os.environ.get("LLM_MODEL","your-model"),):
         try:
             req=urllib.request.Request(base+"/chat/completions",data=json.dumps({"model":model,"max_tokens":400,"messages":[{"role":"system","content":sysm},{"role":"user","content":q}]}).encode(),headers={"Authorization":"Bearer "+key,"Content-Type":"application/json","User-Agent":"Mozilla/5.0"})
