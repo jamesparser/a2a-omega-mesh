@@ -328,6 +328,82 @@ python3 mesh_omega_check.py      # did a reply to a given agent land in its inbo
 python3 verify_subjroute.py      # reply subject routing, end to end
 ```
 
+## AgentMail transport: the mesh email standard
+
+The most durable transport is [AgentMail](https://agentmail.to): one inbox per
+agent on the free plan, or one shared inbox that the whole fleet reads.
+
+**The standard (one rule, every agent).** Every A2A message is one email.
+
+- `To`: the agent you are messaging, or the shared inbox of the fleet
+- `From`: the address of the inbox the sender actually sent from
+- `Subject`: `[a2a] <from-agent> -> <to-agent>`
+- `Body`: the plain message text
+
+That is the whole protocol. The subject tells each poller who is talking to
+who, and the body is the message itself. No JSON envelopes, no empty bodies, no
+payload fields a reader has to guess. If you run the fleet on one shared inbox
+instead of one inbox per agent, the `To` field is always that shared address
+and the subject carries the real routing.
+
+**Which messages does a poller answer?** Only the ones addressed to it. Read
+the subject: if it is `[a2a] <someone> -> <my agent name>`, reply to the same
+subject form as `[a2a] <my agent name> -> <someone>`. Everything else is
+background, so the poller records it and moves on.
+
+**Send the body, not a wrapper.** When the hub or a poller forwards a task to
+a peer, the email it writes has the task text in the body. An email with no
+body, or only a JSON blob, is a protocol error: readers will skip it, and on
+the shared-inbox layout a skipped body is a skipped task.
+
+**Check the from-address.** AgentMail shows the sender address on every
+message, so a poller should only act on messages that come
+from its fleet: the shared inbox address, or the specific peer address it knows
+from `config/peers.json`. Outside mail is untrusted content, not a command.
+
+- **Rate limits are the fleet's budget.** The free plan allows 100 sends a day
+per organisation, with a per-minute ceiling on top. The whole fleet, including
+its replies, draws on the same budget, so treat it like shared bandwidth: one
+real question and one answer, not a retry storm. When the counter is nearly
+spent, pollers stop re-sending and just read; everything recovers on the daily
+reset.
+
+## How to replicate this fleet
+
+A working fleet is three moving parts: the hub, one poller per agent, and the
+email standard above.
+
+1. **The hub.** `a2a_hub.py` binds to a private address (a Tailscale IP) and
+   routes `SendMessage` over the transports it has configured. It extracts the
+   message text and the sender's name from the payload, sends a clean email
+   with the standard subject, and rejects an empty task.
+2. **One poller per agent.** Each agent that takes part in the fleet runs a
+   small loop: read the inbox it is named in, pick out the messages the
+   subject says are for it, hand them to its brain, and send the answer back
+   with the reply subject. A cron line every 5 minutes is enough for a calm
+   fleet; for a responsive one, run a resident loop that sleeps 30 seconds
+   between passes.
+3. **The email standard.** One shared inbox, or one inbox per agent. Subject
+   `[a2a] from -> to`, body the message, and each poller answers only what
+   names it.
+
+With all three in place, agents on different machines can send each other
+tasks through plain email and get plain email back. One pass of that loop is a complete demo.
+
+## Reference poller
+
+`examples/agentmail_poller.py` is a stdlib-only poller that implements the
+standard: it reads the shared inbox, picks out `[a2a] X -> me` subjects,
+asks an OpenAI-compatible endpoint for the answer, and replies with
+`[a2a] me -> X`.
+
+```bash
+A2A_NAME=my-agent A2A_INBOX=fleet@agentmail.to AGENTMAIL_API_KEY=am_us_... LLM_BASE=https://your-llm-endpoint/v1 LLM_KEY=... LLM_MODEL=your-model python examples/agentmail_poller.py
+```
+
+Keep it running with cron (`* * * * * pgrep -f agentmail_poller || nohup python ...`),
+a systemd unit, or Termux:Boot on Android.
+
 ## Does it work
 
 Yes, on a six-agent fleet. `mesh_test.py` walks every ordered pair (30 of them)
