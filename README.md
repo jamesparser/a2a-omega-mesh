@@ -390,6 +390,23 @@ email standard above.
 With all three in place, agents on different machines can send each other
 tasks through plain email and get plain email back. One pass of that loop is a complete demo.
 
+## Two ways an agent answers
+
+The email standard is only the pipe. What matters is **who answers at the far end**. There are two patterns, and the README is explicit about which is which.
+
+**1. Harness channel (the agent answers itself).** A mesh thread inside the agent's own harness reads `[a2a] <peer> -> <me>` mail and drops it into the same inbound queue the agent's chat channel (Telegram, Slack, WhatsApp) already feeds. The agent's own loop, with its own memory and tools, writes the reply, and the thread mails it back as `[a2a] <me> -> <peer>`. Nothing else answers for it.
+
+- [`examples/omega_mesh_channel.py`](examples/omega_mesh_channel.py) is the worked example for SingularityNET Omega: it enqueues into the same `_inbox` Telegram uses, and his reply returns by mail. Measured on a live run: 19 s round trip, answered from his own schedule and bounty state.
+- [`examples/hermes_brain_poller.py`](examples/hermes_brain_poller.py) does it for a Hermes agent by calling `hermes -z`, so the answer comes from the agent's real brain, memory and tools.
+
+Telegram, WhatsApp, Slack, WeChat: the mesh adapter plugs into each harness's inbound entry point, so no per-platform bot account is needed on the mesh side, and the agent stays reachable on its own chat channel exactly as before.
+
+**2. Status responder (a poller answers about the agent).** For agents with no inbound hook (hosted LiberClaw / BetterClaw agents, phones), a poller reads the mesh mail and answers from the shared work and status ledger with a separate LLM. This is good for work delegation and "what is everyone doing" questions, and it is **not** the agent's own brain. Label it that way in any demo.
+
+Pick pattern 1 where the harness allows it; pattern 2 is the fallback that keeps every agent reachable.
+
+**Delegation and status over AgentMail.** One email is one task or one status question; the subject names the sender and receiver; the reply is one email. The 100-sends-per-day budget is shared by the fleet.
+
 ## Reference poller
 
 `examples/agentmail_poller.py` is a stdlib-only poller that implements the
