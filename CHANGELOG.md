@@ -1,3 +1,7 @@
+## 2026-10-14
+- Omega channel: owner-relay of replies with measured timing, file-backed pending state, fixed reply regex (backspace bug).
+- Poller: reboot/self-heal guide, googlevps poller updated to the reply-subject format.
+
 # Revision timeline
 
 Dated record of what broke, what fixed it, and how the fix was verified.
