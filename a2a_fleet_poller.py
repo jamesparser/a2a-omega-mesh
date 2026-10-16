@@ -63,6 +63,8 @@ STATE_DIR = os.path.dirname(os.path.abspath(__file__))
 OWN_AGENTS = [
     a.strip() for a in os.environ.get("A2A_OWN_AGENTS", "agent-two").split(",") if a.strip()]
 
+LANES = {x.strip() for x in os.environ.get("A2A_LANES", "av,am,e2a").split(",") if x.strip()}
+
 sys.path.insert(0, STATE_DIR)
 try:
     import omega_poller as op   # brain + ledger answer pipeline
@@ -413,6 +415,13 @@ def handle(name, key, lane, item_id, text, sender_addr, subject=""):
     if "reply from" in low or "ack from" in low:
         log(f"{name}: INBOUND reply (terminal, {lane}): {' '.join(text[:300].split())[:200]}")
         return True
+    # Several agents may share one AgentMail inbox; the subject
+    # "[a2a] <from> -> <to>" is the from/to marker. Only answer mail meant for me.
+    if lane == "am":
+        _m = re.search(r"\[a2a\]\s*([\w-]+)\s*->\s*([\w-]+)", text[:400], re.I)
+        _to = _m.group(2).lower() if _m else None
+        if _to and _to != name and _to in AGENT_AM:
+            return True
     # 10-03 subject-line routing (am lane): answers carry subject
     # "[a2a] <sender> -> <peer> reply <task>" (legacy: "[a2a] <sender> reply <task>").
     # An answer-subject is terminal - record it, never chain-reply.
@@ -596,9 +605,18 @@ def _handle_decoded(name, key, uid, text, sender_addr):
     # resolves to the hub owner and caused self-replies). Fall back to the
     # envelope sender when the payload carries no JSON sender.
     route_ref = json_sender or sender_addr
-    if json_sender and agent_name_for(json_sender) == name:
+    # Own-echo ONLY when MY OWN identity signed the envelope. A hub-relayed task
+    # (envelope signed by the hub identity) is never an own-echo, even if its JSON
+    # sender is self/unknown: that is a sender-side bug, so answer it.
+    try:
+        own_env = str(sender_addr or "").strip().lower() == str(identity_addr(name)).strip().lower()
+    except Exception:
+        own_env = False
+    if json_sender and agent_name_for(json_sender) == name and own_env:
         log(f"{name}: swept own-echo (agentverse) {task_id[:12]} json_sender={json_sender!r}")
         return True
+    if json_sender and agent_name_for(json_sender) == name and not own_env:
+        log(f"{name}: hub-relayed task self-stamped json_sender={json_sender!r} - answering; reply routes to the operator inbox")
     if not route_ref:
         log(f"{name}: no sender on av {task_id[:12]} - answer logged only")
         return True
@@ -613,6 +631,8 @@ def _serve_agentverse_decoded(name, key, items):
 
 def serve_agentmail(name):
     """Reliable lane. Items arrive as AgentMail message rows."""
+    if "am" not in LANES:
+        return
     inbox = own_am_inbox(name)
     key = (am_keys().get(inbox) or {}).get("key", "")
     if not key:
@@ -632,13 +652,15 @@ def serve_agentmail(name):
     process_lane(
         name, key, "am", items,
         get_id=lambda i: i.get("id") or i.get("message_id"),
-        get_text=lambda i: i.get("bodyText") or i.get("text") or i.get("preview") or "",
+        get_text=lambda i: ((i.get("subject") or "") + chr(10) + (i.get("bodyText") or i.get("text") or i.get("preview") or "")),
         get_sender=lambda i: (i.get("from") or ""),
         get_subject=lambda i: (i.get("subject") or ""))
 
 
 def serve_e2a(name):
     """Read lane only (e2a send is capped)."""
+    if "e2a" not in LANES:
+        return
     items = e2a_inbox(name)
     if items is None:
         return

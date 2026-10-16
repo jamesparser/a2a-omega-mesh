@@ -1,11 +1,7 @@
 """agent2agent-hub: a small, self-hosted A2A (agent-to-agent) routing hub.
 
-Bridges multiple AI agents over interchangeable message transports --
-AgentVerse mailboxes, e2a.dev agent inboxes, and AgentMail email -- while
-exposing an A2A-protocol-shaped JSON-RPC endpoint. Delivery is
-store-and-forward: a peer does not have to be reachable when the task is sent.
-AgentVerse and e2a are agent-native mailboxes, not email; the hub only cares
-that a message lands.
+Bridges multiple AI agents over email transport (AgentMail inboxes) while
+exposing an A2A-protocol-shaped JSON-RPC endpoint:
 
     POST /a2a/v1                    -> SendMessage (async delivery via email)
     GET  /.well-known/agent-card.json -> agent card
@@ -255,20 +251,26 @@ def _send_e2a(p, entry):
         sender = HUB_SENDER_INBOX.split("@")[0] if HUB_SENDER_INBOX else "hub"
         from_email = f"{sender}@agents.e2a.dev" if "@" not in sender else sender
     text = entry if isinstance(entry, str) else json.dumps(entry, default=str)
-    return mod.e2a_send(from_email, to_email, f"[a2a] {entry.get('peer', to_email) if isinstance(entry, dict) else to_email}", text)
+    sender = entry.get('sender', 'unknown') if isinstance(entry, dict) else 'unknown'
+    return mod.e2a_send(from_email, to_email, f"[a2a] {sender} -> {to_email}", text)
 
 
 def _transport_chain(p):
     """Return the ordered transport list to try, honouring A2A_TRANSPORT.
 
-    Canonical order is agentverse -> e2a -> agentmail. A transport the peer
-    cannot use is dropped (no agentverse_address, no e2a_email, no
-    agent_mail_key). Explicit A2A_TRANSPORT just rotates that transport to the
-    front of the same chain, so fallbacks remain intact. Backward compatible:
-    with agent_mail_key/inbox only and no agentverse or e2a fields, the chain is
-    [agentmail] (legacy behavior).
+    Canonical order (10-02): agentverse -> agentmail -> e2a.
+    - agentverse: DEFAULT primary. Host flaps upstream 503, so _route retries
+      it on a 1-minute loop (A2A_AV_RETRY window) before falling through; a
+      background thread keeps retrying after the send completes, until a
+      delivery is accepted, so the backlog drains the moment the host recovers.
+    - agentmail: GUARANTEED BACKUP. Unlimited, cross-account sends OK via
+      per-inbox keys; measured healthy 10-02 (read ~1.4s, send ~1.5s).
+    - e2a: last-resort send only. Free tier is capped (~20 msgs/day/account)
+      and cross-account sending is not enabled on the LC account, so it is a
+      read lane for the fleet, not a reliable send lane.
+    A transport the peer cannot use is dropped; relative order preserved.
     """
-    full = ["agentverse", "e2a", "agentmail"]
+    full = ["agentverse", "agentmail", "e2a"]
     if not _agentverse_usable(p):
         full.remove("agentverse")
     if not _e2a_usable(p):
@@ -291,22 +293,61 @@ def _send_agentverse(p, entry):
 
 
 def _route(peer, entry):
-    """Translate an A2A task into a peer transport, trying in precedence order
-    (Agentverse -> e2a -> AgentMail) and completing on the first success."""
+    """Translate an A2A task into a peer transport, in precedence order
+    (Agentverse -> AgentMail -> e2a) and complete on the first success.
+
+    Agentverse (primary) is RETRIED ON ITS OWN 1-MINUTE LOOP while the host
+    flaps upstream 503 (measured 10-02): up to A2A_AV_RETRY_MIN attempts,
+    one per minute. If it still hasn't accepted by the end of the window,
+    AgentMail carries the message (guaranteed lane) and e2a is the final
+    fallback. The fleet's unified poller reads ALL lanes, so whatever lane
+    delivers gets answered within ~30s."""
     global _seen_reply_ids
+    import time as _time
+    av_retry_min = int(os.environ.get("A2A_AV_RETRY_MIN", "10"))
     _set_status(entry, peer, "working")
     try:
         p = load_peers().get(peer, {})
         chain = _transport_chain(p)
         last_err = {}
+        av_tried = 0
         for t in chain:
             if t == "agentverse":
-                res = _send_agentverse(p, entry)
+                # 1-minute retry loop while the host flaps.
+                res = None
+                while True:
+                    res = _send_agentverse(p, entry)
+                    if res.get("ok"):
+                        break
+                    av_tried += 1
+                    last_err["agentverse"] = res.get("error", "unspecified")
+                    if av_tried >= av_retry_min:
+                        break
+                    print(f"[hub] agentverse {peer} attempt {av_tried}/{av_retry_min} failed; retry in 60s")
+                    _time.sleep(60)
                 if res.get("ok"):
-                    _set_status(entry, peer, "completed",
-                               f"[hub] delivered via Agentverse mailbox to {peer} ({p.get('agentverse_address')}). Poll for reply.")
+                    note = f"[hub] delivered via Agentverse mailbox to {peer} ({p.get('agentverse_address')}) on attempt {av_tried}. Poll for reply."
+                    _set_status(entry, peer, "completed", note)
                     return
-                last_err["agentverse"] = res.get("error", "unspecified")
+                print(f"[hub] agentverse {peer} window exhausted ({av_tried} attempts) - falling through to backup lane")
+            elif t == "agentmail":
+                key = p.get("agent_mail_key", "")
+                inbox = p.get("inbox", "")
+                if not key:
+                    last_err["agentmail"] = f"no transport configured for {peer}"
+                    continue
+                if not inbox:
+                    last_err["agentmail"] = f"cannot deliver to {peer}: no inbox configured"
+                    continue
+                # 10-05: carry the logical from in the subject (shared-pool model)
+                res = am_send(inbox, f"[a2a] {entry.get('sender', 'unknown')} -> {peer}", str(entry.get('prompt') or '').strip())
+                if isinstance(res, dict) and "error" in res:
+                    last_err["agentmail"] = res["error"]
+                    continue
+                _set_status(entry, peer, "completed",
+                           f"[hub] delivered via AgentMail backup to {peer} ({inbox}) "
+                           f"(agentverse window {av_retry_min}min exhausted). Poll for reply.")
+                return
             elif t == "e2a":
                 if not p.get("e2a_email"):
                     last_err["e2a"] = f"no e2a_email configured for {peer}"
@@ -317,22 +358,6 @@ def _route(peer, entry):
                                f"[hub] delivered via e2a to {peer} ({p.get('e2a_email')}). Poll for reply.")
                     return
                 last_err["e2a"] = res.get("error", "unspecified")
-            elif t == "agentmail":
-                key = p.get("agent_mail_key", "")
-                inbox = p.get("inbox", "")
-                if not key:
-                    last_err["agentmail"] = f"no transport configured for {peer}"
-                    continue
-                if not inbox:
-                    last_err["agentmail"] = f"cannot deliver to {peer}: no inbox configured"
-                    continue
-                res = am_send(inbox, f"[a2a] {peer}", json.dumps(entry, default=str))
-                if isinstance(res, dict) and "error" in res:
-                    last_err["agentmail"] = res["error"]
-                    continue
-                _set_status(entry, peer, "completed",
-                           f"[hub] Message delivered to {peer} ({inbox}). Poll for reply.")
-                return
         _set_status(entry, peer, "failed",
                    f"[hub] delivery failed for {peer}: "
                    + "; ".join(f"{k}={v}" for k, v in last_err.items()))
@@ -409,9 +434,6 @@ class Handler(BaseHTTPRequestHandler):
                     {"id": "agent-to-agent", "name": "Cross-agent messaging",
                      "description": "Route a text task to a peer agent's inbox; async delivery, result on poll or webhook.",
                      "tags": ["a2a", "multi-agent", "whitehat"]},
-                    {"id": "fleet-broadcast", "name": "Fleet broadcast",
-                     "description": "Fan one message out to every other peer. Each target gets its own task id under a shared broadcast id.",
-                     "tags": ["a2a", "multi-agent", "ops"]},
                     {"id": "daily-transcript", "name": "Daily transcript",
                      "description": "Owner receives a digest of all agent<->agent exchanges.",
                      "tags": ["ops", "logging"]},
@@ -447,8 +469,6 @@ class Handler(BaseHTTPRequestHandler):
         params = payload.get("params") or {}
         # A2A-spec methods + legacy aliases:
         #   SendMessage / message/send / tasks/send -> async task delivery
-        #   Broadcast / message/broadcast / SendMessage with peer "*" or "all"
-        #       -> fan the same task out to every peer except the sender
         #   tasks/get (alias GET /tasks/<id>) -> task state
         #   tasks/cancel -> mark a not-yet-completed task canceled
         #   OMITTED method (some A2A SDKs send params without a method field)
@@ -477,11 +497,10 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(404, {"jsonrpc": "2.0", "id": payload.get("id"),
                                   "error": f"task {task_id} not found or already terminal"})
             return
-        if method not in ("SendMessage", "message/send", "tasks/send",
-                          "Broadcast", "message/broadcast", "tasks/broadcast") and method is not None:
+        if method not in ("SendMessage", "message/send", "tasks/send") and method is not None:
             self._send_json(400, {"jsonrpc": "2.0", "id": payload.get("id"),
                                   "error": f"unknown method {method!r}",
-                                  "hint": "POST JSON-RPC to /a2a/v1: {\"method\":\"SendMessage\",\"peer\":\"<peer>\",\"params\":{\"message\":{\"messageId\":...,\"parts\":[{\"text\":...}],\"sender\":...}}} | Broadcast (peer \"*\" or \"all\") | tasks/get | tasks/cancel"})
+                                  "hint": "POST JSON-RPC to /a2a/v1: {\"method\":\"SendMessage\",\"peer\":\"<peer>\",\"params\":{\"message\":{\"messageId\":...,\"parts\":[{\"text\":...}],\"sender\":...}}} | tasks/get | tasks/cancel"})
             return
 
         params = payload.get("params") or {}
@@ -492,46 +511,33 @@ class Handler(BaseHTTPRequestHandler):
         parts = msg.get("parts") or []
         if not isinstance(parts, list):
             parts = []
-        prompt = "".join(p.get("text", "") for p in parts if isinstance(p, dict))
-        sender = msg.get("sender") or payload.get("peer") or "unknown"
+        prompt = "".join(str(p.get("text") or p.get("content") or "") for p in parts if isinstance(p, dict))
+        if not prompt.strip():
+            for src in (msg, params, payload):
+                for k in ("text", "content", "prompt", "message", "body", "question", "query", "input"):
+                    v = src.get(k) if isinstance(src, dict) else None
+                    if isinstance(v, str) and v.strip():
+                        prompt = v; break
+                if prompt.strip():
+                    break
+        if not prompt.strip():
+            try:
+                with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "hub_empty_payloads.log"), "a", encoding="utf-8") as _f:
+                    _f.write(time.strftime("%F %T ") + json.dumps(payload)[:1500] + chr(10))
+            except Exception:
+                pass
+        # 10-05 fix: NEVER fabricate sender = peer (the recipient). Under the
+        # shared email pool the logical from must be declared by the client;
+        # when it is absent we stamp "unknown" so receiver echo-guards can
+        # never mistake a relayed task for the reader's own message.
+        sender = msg.get("sender") or params.get("sender") or payload.get("sender") or msg.get("from") or params.get("from") or "unknown"
         peer = payload.get("peer") or sender
         peer = str(peer).replace("/", "_")
 
-        wants_broadcast = (
-            method in ("Broadcast", "message/broadcast", "tasks/broadcast")
-            or str(peer).lower() in ("*", "all", "broadcast")
-            or payload.get("broadcast") is True
-        )
-        if wants_broadcast:
-            peers = load_peers()
-            targets = [n for n in peers if n != sender and n != "unknown"]
-            broadcast_id = f"bc-{int(time.time())}"
-            started = []
-            for name in targets:
-                safe = str(name).replace("/", "_")
-                eid = f"{broadcast_id}-{safe}"
-                entry = {"id": eid, "peer": safe, "sender": sender, "prompt": prompt,
-                         "broadcast": broadcast_id, "status": "submitted", "result": None,
-                         "updated": time.time(),
-                         "history": [{"status": "submitted", "ts": time.time()}]}
-                tasks.setdefault(safe, []).append(entry)
-                threading.Thread(target=_route, args=(safe, entry), daemon=True).start()
-                started.append({"peer": safe, "id": eid})
-            self._send_json(200, {
-                "jsonrpc": "2.0", "id": payload.get("id"),
-                "result": {
-                    "broadcast": {
-                        "id": broadcast_id,
-                        "from": sender,
-                        "status": "submitted",
-                        "targets": started,
-                        "target_count": len(started),
-                        "note": "fan-out to every peer except sender; each target has its own task id",
-                    }
-                },
-            })
+        if not prompt.strip():
+            self._send_json(400, {"jsonrpc": "2.0", "id": payload.get("id"),
+                                  "error": "empty message rejected: put the message text in params.message.parts[0].text (or text/prompt). Standard: subject '[a2a] FROM -> TO', body = message."})
             return
-
         entry = {"id": str(task_id), "peer": peer, "sender": sender, "prompt": prompt,
                  "status": "submitted", "result": None, "updated": time.time(),
                  "history": [{"status": "submitted", "ts": time.time()}]}
