@@ -1,6 +1,6 @@
 # Tweet ready (do not post until the article is live)
 
-Account: **@JasonParserSec** only. Never @RealCryptoCapHQ. No cross-post.
+Account: **@JasonParserSec** only. Never @the brand account. No cross-post.
 
 ## Body (under 280 chars)
 

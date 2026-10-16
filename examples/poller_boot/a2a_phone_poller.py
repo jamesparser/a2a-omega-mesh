@@ -38,7 +38,7 @@ def addressed(subj):
 
 
 def llm_free(q):
-    base=os.environ.get("LLM_BASE","https://freemium.realcryptocap.com/v1")
+    base=os.environ.get("LLM_BASE","https://llm.example.com/v1")
     key=os.environ.get("LLM_KEY","")
     P={"s24":"a phone agent on a Samsung S24 (Android, Termux)","exodus":"a phone agent on an HTC Exodus 1 (Android, Termux)","jason-parser":"the manager/brain agent running on the gaming laptop; you run bug bounties, lanes and X posting","googlevps":"the hot-failover agent on a Google Cloud VPS that backs up omega and runs the mesh failover"}
     ctx=""

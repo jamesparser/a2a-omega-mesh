@@ -31,7 +31,7 @@ collaborate while others are offline.
   period, a comma, or a colon, or restructure the sentence so it does not need a
   parenthetical break.
 - **This already went wrong on this project.** The published article contains 21
-  em dashes because the rule had only ever been recorded as a RealCryptoCap brand
+  em dashes because the rule had only ever been recorded as a the brand brand
   rule, so it never fired for a Jason Parser article. Treat every style rule as
   global unless it explicitly names one channel.
 - **Grep before you ship.** Run `grep -c '—' <file>` on anything you write, and on
@@ -58,7 +58,7 @@ collaborate while others are offline.
    returned `{"ok":true}`, page said "SUBMISSION RECEIVED"). Answered **Yes** to
    "do you plan to deploy or test on Nosana", which is truthful because the form
    asks about plans.
-4. Handoff email already sent to node0datasystems@gmail.com.
+4. Handoff email already sent to the operator inbox.
 
 ## Compute facts. Be precise, this has already gone wrong twice
 
@@ -78,7 +78,7 @@ rule applies to everything you write from now on, not to retro-cleaning his
 published work. Do not "helpfully" fix it, and do not re-raise it.
 
 **2. Watch for publication, then post the tweet.** Once the article goes live, get
-its real URL and post it from **@JasonParserSec** (never @RealCryptoCapHQ, and do
+its real URL and post it from **@JasonParserSec** (never @the brand account, and do
 not cross-post). Ready text, under 280 chars, no dashes, tweak freely but keep it
 plain:
 
@@ -134,12 +134,12 @@ Nosana paragraph with real GLM 5.3 versus rented GPU cost numbers.
 - **Do not modify his live code** on this machine, the gaming laptop, or the VPS.
   All edits happen in `/Users/terminal/_forkwork/`.
 - **Git identity per repo, before the first commit.** This machine's *global* config
-  is `node0datasystems-lgtm <node0datasystems@gmail.com>` and it already leaked into
+  is `the operator's GitHub account` and it already leaked into
   a public history once. Inside the clone always run
   `git config user.name "Jason Parser"` and
   `git config user.email "jamesparser@users.noreply.github.com"`, then verify with
   `git log --format='%an <%ae>'`.
-- **The GitHub connector is bound to the wrong account** (`node0datasystems-lgtm`).
+- **The GitHub connector is bound to the wrong account** (`the operator GitHub account`).
   Pushes to `jamesparser` must go through the logged-in browser session or the
   stored `jamesparser` git credential, never the connector.
 - `jamesparser` is a **frozen typo** in the repo URL. Never suggest renaming it.

@@ -38,7 +38,7 @@ def addressed(subj):
 
 
 def llm_free(q):
-    base=os.environ.get("LLM_BASE","https://freemium.realcryptocap.com/v1")
+    base=os.environ.get("LLM_BASE","https://llm.example.com/v1")
     key=os.environ.get("LLM_KEY","")
     P={"s24":"a phone agent on a Samsung S24 (Android, Termux)","exodus":"a phone agent on an HTC Exodus 1 (Android, Termux)","jason-parser":"the manager/brain agent running on the gaming laptop; you run bug bounties, lanes and X posting","googlevps":"the hot-failover agent on a Google Cloud VPS that backs up omega and runs the mesh failover"}
     ctx=""
@@ -109,7 +109,7 @@ while True:
                     d = json.loads(bs.split("--")[0]); q = str(d.get("prompt") or d.get("message") or d.get("text") or "").strip()
                     body = q if q else ""
                 except Exception: pass
-            ans = llm(body) if body.strip() else "[%s: your message arrived with an EMPTY body (hub task had no prompt). Please email jasonparser@agentmail.to with subject '[a2a] %s -> %s' and your question in the body.]" % (NAME, "YOU", NAME)
+            ans = llm(body) if body.strip() else "[%s: your message arrived with an EMPTY body (hub task had no prompt). Please email operator@agentmail.to with subject '[a2a] %s -> %s' and your question in the body.]" % (NAME, "YOU", NAME)
             sender = re.sub(r".*<|>.*", "", m.get("from", "")) or INBOX
             sendcall("/messages/send", {"to": sender, "subject": "[a2a] %s -> reply" % NAME,
                                     "text": ans or "[%s: empty answer]" % NAME})

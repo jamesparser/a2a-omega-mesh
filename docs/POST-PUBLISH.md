@@ -50,7 +50,7 @@ A VPS shot is polish, not a gate.
 1. **Grab the real URL.** The slug may not be
    `your-ai-agents-dont-need-you-anymore`. Use whatever the live post has.
 2. **Tweet from @JasonParserSec only.** Text is in `docs/TWEET.md`. Do not use
-   @RealCryptoCapHQ. Do not cross-post. If this machine cannot post from the
+   @the brand account. Do not cross-post. If this machine cannot post from the
    owner's X account, hand him the URL and the text.
 3. **Host the demo.** Upload `assets/a2a-omega-demo-46s.mp4` (or the polished
    version with title and end cards) somewhere with a stable link: GitHub

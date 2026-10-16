@@ -41,7 +41,7 @@ form doubles as the project proposal. **One claim per team.** Text to paste:
 | Featured image | `docs/featured.png` (uploaded to HackerNoon CDN as `images/img-5p03rto.png`) |
 | Demo | **ready** - `assets/a2a-omega-demo-narrated.mp4` (30s, live Tailscale hub session + voiceover) and `assets/a2a-omega-demo-full.mp4` (55s, title/body/end). Hub stays private (127.0.0.1/Tailscale). |
 | HackerNoon post | **still in editorial review as of 2026-10-02.** Writer tracker: "Stories in Editorial", submitted 5 days ago, not published, not rejected. Project submit at decentralizeai.tech waits on the live URL. |
-| Live fleet check | **passed 2026-10-02.** Hub 100.106.162.70:8787 over Tailscale: healthz ok, 9 peers, protocol 0.3.0. SendMessage delivered. Agents answering real audit questions. |
+| Live fleet check | **passed 2026-10-02.** Hub <hub-host>:8787 over Tailscale: healthz ok, 9 peers, protocol 0.3.0. SendMessage delivered. Agents answering real audit questions. |
 
 ## Blockers - owner only
 
