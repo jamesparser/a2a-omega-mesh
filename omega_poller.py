@@ -15,7 +15,7 @@ on a single agent (default) or a comma-list of agents (fix several pollers at on
 
 CONFIG (env, none committed) -------------------------------
   A2A_AGENTVERSE_ENV      path to agentverse.env holding AGENTVERSE_API_KEY
-                          (default ./notes/agentverse.env)
+                          (default /opt/omega/workspace/notes/agentverse.env)
   A2A_AGENTVERSE_API_KEY  the Agentverse JWT directly (overrides the file)
   A2A_OWN_AGENTS          comma list of agent names THIS machine acts for.
                           default "agent-two". For the 4 LC/BC:
@@ -45,9 +45,9 @@ RUN ---------------------------------------------------------
   python omega_poller.py           # run forever (log to stdout; nohup it)
 
 On the omega VPS:
-  cd cd into the repo root
+  cd /opt/omega/workspace/a2a-omega
   python3 -m pip install uagents uagents_core   # if not already
-  A2A_AGENTVERSE_ENV=./notes/agentverse.env \
+  A2A_AGENTVERSE_ENV=/opt/omega/workspace/notes/agentverse.env \
   nohup python3 omega_poller.py > omega_poller.log 2>&1 &
 """
 import json
@@ -64,7 +64,7 @@ from datetime import datetime
 BASE = os.environ.get("A2A_AGENTVERSE_BASE", "https://agentverse.ai").rstrip("/")
 SEED_PREFIX = os.environ.get("A2A_SEED_PREFIX", "a2a-omega-e2a-fleet-")
 POLL_SEC = int(os.environ.get("A2A_POLL_SEC", "2"))
-KEY_FILE = os.environ.get("A2A_AGENTVERSE_ENV", "./notes/agentverse.env")
+KEY_FILE = os.environ.get("A2A_AGENTVERSE_ENV", "/opt/omega/workspace/notes/agentverse.env")
 OWN_AGENTS = [a.strip() for a in os.environ.get("A2A_OWN_AGENTS", "agent-two").split(",") if a.strip()]
 STATE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -135,6 +135,14 @@ LEDGER_DIR = os.environ.get("A2A_LEDGER_DIR",
 def load_ledger(name):
     """Grounded live state for an agent: {active, queue[], note}. Empty if absent.
     This is what makes status answers reflect reality instead of confabulation."""
+    if name == 'agent-two':  # LIVE_OMEGA 10-12: real file tail, not a stale hand-written ledger
+        try:
+            fp0 = '/workspace/ledgers/SCHEDULE.md'
+            t = open(fp0, errors='ignore').read()[-2600:]
+            mt = datetime.fromtimestamp(os.path.getmtime(fp0)).strftime('%Y-%m-%d %H:%M')
+            return {'active': None, 'queue': [], 'note': 'Your own SCHEDULE.md tail (last written ' + mt + '; newest at end): ' + t}
+        except Exception:
+            pass
     fp = os.path.join(LEDGER_DIR, f"{name}.json")
     try:
         with open(fp) as f:
@@ -181,7 +189,7 @@ def looks_like_status(t):
 
 
 def consume_directive(name, t):
-    """Closed-loop: when the operator sends a 'start your top task' directive, this agent
+    """Closed-loop: when jason sends a 'start your top task' directive, this agent
     pulls the top of ITS OWN queue into 'active' (working now) and confirms it.
     Returns a confirmation string, or None if it is not a start-directive."""
     if not re.search(r"\bDIRECTIVE\b|\bstart your top task\b|\bstart the top\b|\bbegin your top\b", t, re.I):
@@ -494,7 +502,7 @@ def main():
         log(f"ERROR: uagents SDK missing ({e}). Run: pip install uagents uagents_core")
         return 2
 
-    # One-shot OUTBOUND commands (ANY agent can use these - not just the operator):
+    # One-shot OUTBOUND commands (ANY agent can use these - not just jason):
     #   python omega_poller.py --send <as_name> <target> "<text>"
     #       sign as <as_name> (must be in OWN_AGENTS), deliver to <target>'s mailbox
     #   python omega_poller.py --batch "<text>"

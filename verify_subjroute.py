@@ -1,7 +1,7 @@
 import json, os, sys, urllib.request
 os.chdir("/workspace"); sys.path.insert(0,"/workspace")
 import importlib.util
-spec=importlib.util.spec_from_file_location("P","a2a_fleet_poller.py")
+spec=importlib.util.spec_from_file_location("P","/workspace/a2a_fleet_poller.py")
 P=importlib.util.module_from_spec(spec); spec.loader.exec_module(P)
 P.log=lambda m:None
 MARK=os.environ.get("PROOF_MARKER","")
@@ -24,9 +24,9 @@ for m in om:
     subj=str(m.get("subject") or ""); blob=subj+" "+str(m.get("bodyText") or m.get("text") or "")
     tag=""
     if MARK and MARK in blob: tag=" **MARKER-HIT**"
-    if ("agent-one" in subj and ("reply" in subj.lower() or "REPLY from agent-one" in blob)):
+    if ("agent-one" in subj and ("reply" in subj.lower() or "REPLY from jason" in blob)):
         hits+=1
         print(f"  subj={subj!r}  from={m.get('from')!r}{tag}")
         print(f"     {blob[:200]}")
-print(f"  agent-one -> agent-two reply hits in agent-two inbox: {hits}")
-print("VERDICT:", "PASS - agent-one's reply reached agent-two's inbox" if (hits or any(MARK and MARK in str(m.get('bodyText') or '') for m in om)) else "NOT YET - reply not in omega inbox (hub may still be in agentverse retry)")
+print(f"  jason->omega reply hits in omega inbox: {hits}")
+print("VERDICT:", "PASS - jason's reply reached agent-two's inbox" if (hits or any(MARK and MARK in str(m.get('bodyText') or '') for m in om)) else "NOT YET - reply not in omega inbox (hub may still be in agentverse retry)")

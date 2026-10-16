@@ -23,7 +23,7 @@ backlog drains the moment it recovers.
 Env:
   A2A_OWN_AGENTS        comma list (narrowed by __actor=)
   A2A_AGENTVERSE_ENV    agentverse.env (AGENTVERSE_API_KEY)
-  A2A_AGENTMAIL_KEYS    path to agentmail_keys.json (addr -> {key})
+  A2A_AGENTMAIL_KEYS    path to agentmail_keys_vps.json (addr -> {key})
   A2A_E2A_KEY_FILES     comma list of e2a .env files
   A2A_POLL_SEC          default 5
   A2A_AM_POLL_SEC       agentmail/e2a poll interval, default 30
@@ -41,14 +41,14 @@ import urllib.request
 from datetime import datetime
 
 AV_BASE = os.environ.get("A2A_AGENTVERSE_BASE", "https://agentverse.ai").rstrip("/")
-AV_KEY_FILE = os.environ.get("A2A_AGENTVERSE_ENV", "./notes/agentverse.env")
-AM_KEYS_FILE = os.environ.get("A2A_AGENTMAIL_KEYS", "./notes/agentmail_keys.json")
+AV_KEY_FILE = os.environ.get("A2A_AGENTVERSE_ENV", "/workspace/notes/agentverse.env")
+AM_KEYS_FILE = os.environ.get("A2A_AGENTMAIL_KEYS", "/workspace/agentmail_keys_vps.json")
 E2A_BASE = os.environ.get("A2A_E2A_BASE", "https://api.e2a.dev").rstrip("/")
 E2A_KEY_FILES = [
     p.strip() for p in os.environ.get(
         "A2A_E2A_KEY_FILES",
-        "./notes/e2a.env,./notes/e2a2.env,"
-        "./notes/e2a.env,./notes/e2a2.env").split(",") if p.strip()
+        "/workspace/notes/e2a.env,/workspace/notes/e2a2.env,"
+        "/workspace/tmp/e2a.env,/workspace/tmp/e2a2.env").split(",") if p.strip()
 ]
 E2A_UA = os.environ.get(
     "A2A_E2A_USER_AGENT",
@@ -159,9 +159,9 @@ def e2a_inbox(name):
 
 
 # Verified agent -> AgentMail inbox map (banked on the VPS, 10-02). The values
-# are exactly the inboxes readable with the keys in agentmail_keys.json.
-# LC/BC use random-alias inboxes, not their own names. the operator inbox is the
-# the operator address (the one the operator's local responder replies to). This map
+# are exactly the inboxes readable with the keys in agentmail_keys_vps.json.
+# LC/BC use random-alias inboxes, not their own names. Jason's inbox is the
+# org address operator@ (the one the local responder replies to). This map
 # is used BOTH for "my own inbox to read" and for "resolve the sender's inbox
 # to deliver a reply".
 AGENT_AM = {
@@ -172,7 +172,7 @@ AGENT_AM = {
     "agent-five": "agent-five@agentmail.to",
     "agent-six": "agent-six@agentmail.to",
 }
-OP_INBOX = "operator@agentmail.to"  # operator read inbox
+OP_INBOX = "operator@agentmail.to"  # operator (Jason) read inbox
 
 # reverse alias maps, built once: agentmail inbox alias -> agent name, and
 # agentverse identity address -> agent name. Used to resolve any sender ref.
@@ -192,6 +192,14 @@ if HAVE_OP:
         pass
 
 
+AGENT_AM.setdefault("agent-seven", "agent-two@agentmail.to")  # shared inbox; subject routes
+if HAVE_OP:
+    try:
+        _ID_ADDR_MAP[op.identity("agent-seven").address.lower()] = "agent-seven"
+    except Exception:
+        pass
+
+
 def agent_name_for(sender_ref):
     """Resolve ANY sender ref (agent name, @agentmail.to, @agents.e2a.dev, or an
     agentverse identity address) to a known fleet agent name, else None."""
@@ -207,8 +215,10 @@ def agent_name_for(sender_ref):
         return _INBOX_ALIAS[s]
     if s in _ID_ADDR_MAP:
         return _ID_ADDR_MAP[s]
-    for tok, nm in (("operator", "agent-one"), ("agent-two", "agent-two"),
-                    ("liberclaw", "agent-three"), ("betterclaw", "agent-four")):
+    for tok, nm in (("jason", "agent-one"), ("nora-feld", "agent-one"),
+                    ("operator", "agent-one"), ("agent-two", "agent-two"),
+                    ("omega", "agent-two"), ("liberclaw", "agent-three"),
+                    ("betterclaw", "agent-four")):
         if tok in s:
             return nm
     return None
@@ -241,7 +251,7 @@ def av_identity_addr(sender_ref):
 
 def own_am_inbox(name):
     """My own AgentMail inbox to read (per-agent)."""
-    return AGENT_AM.get(name, OP_INBOX)
+    return OP_INBOX  # 10-11 boss standard: ONE shared inbox, subject routes
 
 
 # 10-03 fix (subject-line routing): AgentMail's `from` field on a listing row
@@ -251,7 +261,7 @@ def own_am_inbox(name):
 #   (a) the hub task JSON body:  {"sender": <agent>, "peer": <agent>, ...}
 #   (b) the subject tokens:      "[a2a] <sender> -> <peer>" (task),
 #                                "[a2a] <sender> -> <peer> reply <task>" (answer)
-# One shared key pool (agentmail_keys.json) covers every send - an agent
+# One shared key pool (agentmail_keys_vps.json) covers every send - an agent
 # delivers into the recipient's inbox using that inbox's OWN banked key.
 _SUBJ_TASK_RE = re.compile(r"^\[a2a\]\s+([A-Za-z0-9._\-]+)\s*->\s*([A-Za-z0-9._\-]+)")
 _SUBJ_REPLY_RE = re.compile(r"^\[a2a\]\s+([A-Za-z0-9._\-]+)\s+(reply|ack)\b")
@@ -357,13 +367,24 @@ def save_attempts(name, lane, d):
 
 # ------------------------------------------------------------- answering
 def answer(name, text):
-    """Return (answer_str_or_None, kind)."""
+    """Real answers only: status-style questions go to the agent's own LLM
+    with its live ledger in the prompt; the LLM says plainly when the ledger
+    is empty. The canned (a)/(b)/(c) template is never used."""
     if HAVE_OP:
         if op.looks_like_status(text):
-            return op.status_answer(name, text), "ledger"
+            led = op.load_ledger(name)
+            extra = ('\nYour live ledger: ' + repr(led) +
+                    '\nAnswer using ONLY the live ledger above. If it has no current'
+                    ' active task or queue, say plainly that you have no live work'
+                    ' recorded - never invent a status.')
+            a = op.llm_answer(text + extra, agent=name)
+            if a:
+                return a, 'brain+ledger'
+            return None, 'no-brain'
         a = op.llm_answer(text, agent=name)
-        return (a, "brain") if a else (None, "no-brain")
-    return None, "no-brain"
+        return (a, 'brain') if a else (None, 'no-brain')
+    return None, 'no-brain'
+
 
 
 def reply(name, sender_addr, task_id, prompt, body):
@@ -412,16 +433,18 @@ def identity_addr(name):
 def handle(name, key, lane, item_id, text, sender_addr, subject=""):
     """Process one inbound. Returns True when fully handled (safe to mark seen)."""
     low = text.lower()
-    if "reply from" in low or "ack from" in low:
-        log(f"{name}: INBOUND reply (terminal, {lane}): {' '.join(text[:300].split())[:200]}")
-        return True
-    # Several agents may share one AgentMail inbox; the subject
-    # "[a2a] <from> -> <to>" is the from/to marker. Only answer mail meant for me.
+    # RECIP_FILTER: several agents may share one AgentMail inbox; the subject
+    # "[a2a] <from> -> <to>: tag" is the from/to marker. Only answer mail meant for me.
     if lane == "am":
         _m = re.search(r"\[a2a\]\s*([\w-]+)\s*->\s*([\w-]+)", text[:400], re.I)
         _to = _m.group(2).lower() if _m else None
-        if _to and _to != name and _to in AGENT_AM:
+        if name == "agent-seven" and _to != "agent-seven":
             return True
+        if _to and _to != name:
+            return True  # 10-12: answer ONLY mail addressed to me
+    if "reply from" in low or "ack from" in low:
+        log(f"{name}: INBOUND reply (terminal, {lane}): {' '.join(text[:300].split())[:200]}")
+        return True
     # 10-03 subject-line routing (am lane): answers carry subject
     # "[a2a] <sender> -> <peer> reply <task>" (legacy: "[a2a] <sender> reply <task>").
     # An answer-subject is terminal - record it, never chain-reply.
@@ -605,9 +628,11 @@ def _handle_decoded(name, key, uid, text, sender_addr):
     # resolves to the hub owner and caused self-replies). Fall back to the
     # envelope sender when the payload carries no JSON sender.
     route_ref = json_sender or sender_addr
-    # Own-echo ONLY when MY OWN identity signed the envelope. A hub-relayed task
-    # (envelope signed by the hub identity) is never an own-echo, even if its JSON
-    # sender is self/unknown: that is a sender-side bug, so answer it.
+    # 10-05: own-echo ONLY when MY OWN identity signed the envelope. A
+    # hub-relayed task (envelope signed by the hub seed a2a-omega-hub) is
+    # never an own-echo, even if its JSON sender is self/unknown - the hub
+    # no longer fabricates sender=peer, so a self-stamped json_sender on a
+    # hub envelope is a sender-side bug, not my message. Answer it.
     try:
         own_env = str(sender_addr or "").strip().lower() == str(identity_addr(name)).strip().lower()
     except Exception:
@@ -616,7 +641,7 @@ def _handle_decoded(name, key, uid, text, sender_addr):
         log(f"{name}: swept own-echo (agentverse) {task_id[:12]} json_sender={json_sender!r}")
         return True
     if json_sender and agent_name_for(json_sender) == name and not own_env:
-        log(f"{name}: hub-relayed task self-stamped json_sender={json_sender!r} - answering; reply routes to the operator inbox")
+        log(f"{name}: hub-relayed task self-stamped json_sender={json_sender!r} - answering; reply routes to OP inbox (sender client should declare its own sender)")
     if not route_ref:
         log(f"{name}: no sender on av {task_id[:12]} - answer logged only")
         return True

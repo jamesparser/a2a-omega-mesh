@@ -5,7 +5,7 @@ usage: python3 mesh_omega_check.py <agent-name> [since_iso_z]"""
 import json, os, sys, urllib.request
 os.chdir("/workspace"); sys.path.insert(0, "/workspace")
 import importlib.util
-spec = importlib.util.spec_from_file_location("P", "a2a_fleet_poller.py")
+spec = importlib.util.spec_from_file_location("P", "/workspace/a2a_fleet_poller.py")
 P = importlib.util.module_from_spec(spec); spec.loader.exec_module(P)
 P.log = lambda m: None
 
