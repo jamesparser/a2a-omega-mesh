@@ -1,0 +1,25 @@
+{
+  "round_trip_2": {
+    "tag": "LAPTOP-MCP-ROUNDTRIP",
+    "path": "laptop Hermes (MCP tools/call via configured a2a-mesh-board ssh-stdio server) -> omega prod board 18792 -> googlevps (direct tailnet, independent ssh-keygen verify + durable receipt + ack + signed response) -> laptop MCP mesh_read + mesh_ack",
+    "request_id": "d02e30f0-6ddc-407b-88a0-5301b4566d78",
+    "response_id": "806dccf1-a73f-4bc6-a351-e652f1a08c2b",
+    "googlevps_verify": {"request_signature_valid": true, "ack": "acked", "response": "accepted"},
+    "laptop_verify": {"signature_valid": true, "durably_received": true, "ack": "acked", "inbox_after": "empty"},
+    "timestamp_utc": "2026-10-31T00:4xZ"
+  },
+  "round_trip_1": {
+    "tag": "PROD-MCP-TEST-1",
+    "path": "rci-vps MCP mesh_post -> googlevps -> rci-vps MCP mesh_read/ack",
+    "request_id": "22d96849-3fc8-429f-a95b-3f1d9f69a6cb",
+    "response_id": "71f03203-0032-453f-aae4-9480993ed81e",
+    "dedupe_evidence": {"retry_same_content": {"dedupe": "collapsed", "returned_original_id": "22d96849-3fc8-429f-a95b-3f1d9f69a6cb"}},
+    "ack_semantics": ["acked", "already-acked", "inbox empty after ack"]
+  },
+  "mcp_transport": {
+    "config_block": "AppData/Local/hermes/config.yaml mcp_servers.a2a-mesh-board (ssh stdio, BatchMode, pinned host key alias)",
+    "live_probe_from_laptop": "initialize OK + tools/list 5 tools + tools/call mesh_inbox/mesh_post/mesh_read/mesh_ack all HTTP 200",
+    "tool_names_in_hermes": ["mcp_a2a_mesh_board_mesh_post", "mcp_a2a_mesh_board_mesh_inbox", "mcp_a2a_mesh_board_mesh_read", "mcp_a2a_mesh_board_mesh_ack", "mcp_a2a_mesh_board_mesh_respond"],
+    "note": "Hermes spawns the MCP server over an SSH stdio pipe to omega; the agent process on any device can use the same pattern with its own key/principal."
+  }
+}

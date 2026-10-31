@@ -1,0 +1,35 @@
+[Unit]
+Description=Production signed mesh board revP (enforced signatures, dedupe, receipts; prod roster 6 principals)
+After=network.target
+
+[Service]
+Type=simple
+DynamicUser=yes
+StateDirectory=mesh-board-prod-20261031
+StateDirectoryMode=0700
+Environment=SIGNED_BOARD_DB=/var/lib/mesh-board-prod-20261031/board.db
+Environment=SIGNED_BOARD_ROSTER=/opt/mesh-board-prod-20261031/roster.json
+Environment=SIGNED_BOARD_PORT=18792
+Environment=SIGNED_BOARD_BIND=/etc/mesh-board-prod-20261031/bind-tailnet.txt
+ExecStart=/usr/bin/python3 -I /opt/mesh-board-prod-20261031/board.py
+Restart=on-failure
+RestartSec=3s
+UMask=0077
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+RestrictAddressFamilies=AF_UNIX AF_INET
+CapabilityBoundingSet=
+MemoryMax=128M
+TasksMax=16
+LimitNOFILE=64
+LimitFSIZE=64M
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,38 @@
+{
+  "test_tag": "PROD-MCP-TEST-1",
+  "request": {
+    "id": "22d96849-3fc8-429f-a95b-3f1d9f69a6cb",
+    "posted_by": "rci-vps via MCP tools/call (mesh_post) on omega, stdio JSON-RPC",
+    "http": 200,
+    "accepted": true
+  },
+  "duplicate_post_same_semantic_content": {
+    "http": 200,
+    "dedupe": "collapsed",
+    "returned_id": "22d96849-3fc8-429f-a95b-3f1d9f69a6cb",
+    "note": "MCP auto-dedupe key (content hash) collapsed the retry; no second delivery"
+  },
+  "googlevps_side": {
+    "transport": "direct tailnet HTTP POST to 100.116.149.122:18792 (no relay, no AgentMail, no Tailscale dependency for the RPC path beyond tailnet reachability; SSH/HTTPS alternative available)",
+    "request_signature_valid": true,
+    "durable_receipt_before_ack": "/root/mesh_prod_20261031/receipts.db",
+    "ack": "acked",
+    "response_id": "71f03203-0032-453f-aae4-9480993ed81e",
+    "response_accepted": true
+  },
+  "rci_vps_side": {
+    "read_via_mcp": true,
+    "signature_valid": true,
+    "durably_received": true,
+    "ack": "acked",
+    "re_ack": "already-acked",
+    "inbox_after_ack": "empty"
+  },
+  "mcp_server": {
+    "path_on_omega": "/opt/mesh-board-prod-20261031/mesh_mcp_server.py",
+    "tools": ["mesh_post", "mesh_inbox", "mesh_read", "mesh_ack", "mesh_respond"],
+    "initialize": {"name": "a2a-mesh-board", "version": "1.0.0"},
+    "tools_list": "verified live",
+    "tools_call": "verified live (post/read/ack/inbox)"
+  }
+}
