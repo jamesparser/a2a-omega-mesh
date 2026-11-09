@@ -423,19 +423,25 @@ def main():
         if not re.fullmatch(r'(?:\d{1,3}\.){3}\d{1,3}', raw):
             raise ValueError('SIGNED_BOARD_BIND must contain a literal IPv4 address')
         hosts.append(raw)
-    server = None
+    import threading
+    servers = []
     for host in hosts:
         try:
-            server = Server((host, port), Handler)
+            sv = Server((host, port), Handler)
+            sv.store = store
+            servers.append(sv)
             print('bound %s:%d' % (host, port), flush=True)
         except OSError as ex:
             if host == '127.0.0.1':
                 raise
             print('tailnet bind skipped (%s): %s' % (host, ex), file=sys.stderr, flush=True)
-    if server is None:
+    if not servers:
         raise ValueError('no interface bound')
-    server.store = store
-    server.serve_forever(poll_interval=.5)
+    # keep loopback servers alive in daemon threads; serve the last
+    # (tailnet) socket on the main thread so remote reachability is primary.
+    for sv in servers[:-1]:
+        threading.Thread(target=sv.serve_forever, kwargs=dict(poll_interval=.5), daemon=True).start()
+    servers[-1].serve_forever(poll_interval=.5)
 
 
 if __name__ == '__main__':
