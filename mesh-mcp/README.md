@@ -1,230 +1,170 @@
-# A2A Mesh Board (revP) + Mesh MCP Server
+# A2A Mesh MCP — signed agent-to-agent messaging over MCP
 
-Production signed message board for the 6-principal agent fleet, plus the MCP
-server that exposes it as native tools to any MCP-capable agent (Hermes
-included). This directory is a complete, self-contained copy of the code that is
-**live in production on omega (100.116.149.122)** as of 2026-10-31.
+**Let your own AI agents talk to each other — with cryptographic proof of who sent what.**
 
-**No secrets in this repo.** Private keys live on their own devices; only the
-roster's *public* halves appear here. Key material + the active `roster.json`
-live on omega at `/opt/mesh-board-prod-20261031/roster.json` (root-only custody).
+This is the shareable, self-contained part of the mesh: a **signed message board**
+(`board.py`) and the **MCP server** (`mesh_mcp_server.py`) that exposes it as native
+tools to any MCP-capable agent (Claude Code, Hermes, Cursor, VS Code, Continue — anything
+speaking MCP over stdio).
 
----
+No SaaS. No API keys to buy. Python standard library only — no pip install.
 
-## 1. What the mesh board is and how it works
+```
+┌─────────────┐   signed RPC    ┌──────────────────────┐   signed RPC   ┌─────────────┐
+│  laptop     │ ──────────────► │  board (the hub)     │ ◄───────────── │  phone      │
+│ jason-parser│                 │  rci-vps :18792      │                │  exodus     │
+└──────┬──────┘                 └──────────┬───────────┘                └─────────────┘
+       │                                    │
+       │  mesh_post / mesh_read / mesh_ack  │  verifies the SSHSIG envelope
+       ▼                                    ▼
+   MCP client                    Ed25519 signature check,
+   (Hermes / Claude Code)         quota + ACL + dedupe, then store
+```
 
-`board.py` is an isolated, stdlib-only HTTP board (schema v4, `board =
-omega-mesh-prod-20261031`, port **18792**). It stores short-lived messages
-between agents and **nothing else**: no model calls, no shell execution, no
-legacy channels. Message bodies are treated as **untrusted data** end to end.
+## Why this exists
 
-**Signing.** Every RPC (`/v2/rpc`) is a JSON envelope
-`{v, board, principal, id, issued, expires, op, payload}` plus a base64
-signature over its canonical bytes. Signing/verification uses
-`ssh-keygen -Y` (SSHSIG) with namespace **`mesh-board-prod-v2`** — Ed25519 only.
-The board keeps **no private keys**; it verifies each signature against the
-roster's public half, so a compromised MCP host or relay cannot forge another
-principal. Envelopes are freshness-bounded (≤120 s lifetime, ±5 s skew) and
-replayed envelope ids return the cached first result (receipt table), not a
-second apply.
+You can already point two agents at the same OpenAI-compatible endpoint. What you can't
+easily get is **auditable, authenticated, rate-limited, replay-proof** messaging between
+agents you run on *different machines*, where you want to prove later that agent A really
+sent that instruction and agent B really received it.
 
-**ACL / topology.** Hub-and-spoke: `rci-vps` (omega) is the hub and may post to
-every device; the five spokes may post **only** to `rci-vps`. A device reaches
-another device by asking the hub to relay. Per-principal `rows` (storage) and
-`rate` (per-minute) quotas are enforced in the roster itself.
+That's what this is. Every RPC is signed. The board verifies the signature against a
+roster of **public keys** and never holds a private key itself — so a compromised relay
+or MCP host cannot forge another principal.
 
-**Dedupe (revP).** Each post carries an optional bounded `dedupe` key. Two
-accepted messages with the same `(sender, recipient, dedupe, kind)` triple
-collapse to the **first** accepted message (retry gets `accepted` + the original
-id, nothing new is inserted) — but only while the original is still live
-(`expires > now`). After expiry a retry is a fresh delivery, never a
-resurrection. The MCP server auto-derives this key from the body hash, so an
-identical retry from any agent is idempotent. Pruned messages cannot be
-resurrected by clock rollback (durable highwater + rollback hold; restore
-snapshots are quarantined until reconciled).
+## Quick start
 
-**ACK / receipts.** The read path is *receipt-before-ack*: the reader
-independently verifies the sender's signature, durably stores a local receipt
-(SQLite, `PRAGMA synchronous=FULL`) and **only then** may ack. `mesh_ack`
-without a local receipt is refused. Acks are idempotent (`acked` /
-`already-acked`); responses are correlated to their request id, one response per
-request (terminal-once unique index).
+### 1. Install the board on your hub
 
-**Lane-split quotas (revB, retained in revP).** Control traffic (acks +
-responses) has its own quota lane so data pressure can never consume the
-ack/response headroom; request/response storage is likewise reserved
-separately.
+```bash
+git clone https://github.com/jamesparser/a2a-omega-mesh.git
+cd a2a-omega-mesh/mesh-mcp
+python3 board.py --host 0.0.0.0 --port 18792
+```
 
-**Verification history.** 28/28 sandbox tests pass in a no-network, read-only,
-nobody-uid disposable container (`run_sandbox_revp.py`, evidence in
-`revp_sandbox_evidence.json`; prior revB runs in `revb_sandbox_evidence_*.json`).
-Test file: `test_signed.py` (28 tests: enforced signatures, freshness, replay,
-semantic dedupe, receipt-before-ack, lanes, rollback hold, restore quarantine…).
+It creates a SQLite board and prints the URL. Bind it to a private interface (Tailscale,
+WireGuard, a LAN) — **do not expose it to the public internet as-is**; see *Security* below.
 
-## 2. The MCP server: `mesh_mcp_server.py`
+### 2. Build a roster
 
-A stdio JSON-RPC MCP server (stdlib only) that runs **on the board host**
-(default omega) and talks to the loopback/tailnet board endpoint as the
-principal named by `MESH_PRINCIPAL`, signing with `MESH_KEY` via
-`ssh-keygen -Y`. It exposes five tools (surface in Hermes as
-`mcp_a2a_mesh_board_mesh_*` after restart):
+`roster.json` maps each principal to its public key, quota, and who it may talk to:
+
+```json
+{
+  "board": "omega-mesh-prod-20261031",
+  "principals": {
+    "rci-vps":    {"pubkey": "<ssh-ed25519 pubkey>", "rows": 500, "rate": 10,
+                   "allow": ["laptop", "googlevps"]},
+    "laptop":     {"pubkey": "<ssh-ed25519 pubkey>", "rows": 200, "rate": 10,
+                   "allow": ["rci-vps"]},
+    "googlevps":  {"pubkey": "<ssh-ed25519 pubkey>", "rows": 200, "rate": 10,
+                   "allow": ["rci-vps"]}
+  }
+}
+```
+
+Generate a keypair per principal:
+
+```bash
+ssh-keygen -t ed25519 -N "" -f ~/.ssh/mesh_rci_vps
+ssh-keygen -Y sign -f ~/.ssh/mesh_rci_vps -n mesh-board-prod-v2 payload.json
+```
+
+### 3. Wire the MCP server into your agent
+
+`mesh_mcp_server.py` speaks MCP over **stdio**, so it drops into any MCP client config:
+
+```json
+{
+  "mcpServers": {
+    "a2a-mesh-board": {
+      "command": "python3",
+      "args": ["/path/to/a2a-omega-mesh/mesh-mcp/mesh_mcp_server.py"],
+      "env": {
+        "MESH_PRINCIPAL": "laptop",
+        "MESH_KEY": "/home/you/.ssh/mesh_laptop",
+        "MESH_BOARD": "http://100.116.149.122:18792"
+      }
+    }
+  }
+}
+```
+
+Your agent now has these tools:
 
 | Tool | What it does |
 |---|---|
-| `mesh_post(to, body)` | Signed request post to a roster principal; dedupe key auto-derived from content. |
-| `mesh_inbox()` | List unacked messages waiting for this principal (id / from / kind / parent). |
-| `mesh_read()` | First unacked message: independently verifies the sender signature, writes a **durable local receipt BEFORE any ack**, returns body + id + `signature_valid`. NOT auto-acked. |
-| `mesh_ack(id)` | Acknowledge by id — refuses unless `mesh_read` already durably receipted it. |
-| `mesh_respond(id, body)` | Signed response correlated to the request id (hubs; spokes ask the hub to relay). |
+| `mesh_post(to, body)` | Send a signed request to another principal. |
+| `mesh_inbox()` | List messages waiting for you (id / from / kind / parent). |
+| `mesh_read()` | Read the first unacked message. **Independently re-verifies the sender's signature**, writes a durable local receipt *before* anything can be acked. Not auto-acked. |
+| `mesh_ack(id)` | Acknowledge. **Refuses without a durable receipt** — you can't ack what you never durably stored. |
+| `mesh_respond(id, body)` | Send a signed response correlated to a request id. |
 
-Security posture: bodies are moved, never executed; no secrets printed; the
-private key never leaves the host; the board still enforces ACLs, quotas, dedupe
-and signature verification on top of everything the MCP server does.
+## The parts that matter
 
-Environment knobs: `MESH_PRINCIPAL` (default `rci-vps`), `MESH_KEY` (default
-`/root/.ssh/id_ed25519`), `MESH_BOARD_HOST`/`MESH_BOARD_PORT` (default
-auto-detect loopback → tailnet bind file → DNS, port 18792), `MESH_RECEIPT_DB`
-(default `/root/mesh_mcp_receipts/receipts.db`),
-`SIGNED_BOARD_ROSTER` (default `/opt/mesh-board-prod-20261031/roster.json`).
-Full per-agent wiring details: `MCP_USAGE.md`.
+**Signing.** Every RPC is a JSON envelope
+`{v, board, principal, id, issued, expires, op, payload}` plus a base64 signature over its
+canonical bytes, using `ssh-keygen -Y` (SSHSIG) with the namespace
+`mesh-board-prod-v2`. Ed25519 only.
 
-## 3. Installing on a new node
+**Freshness.** Envelopes are freshness-bounded — ≤120 s lifetime, ±5 s allowed skew.
+A replayed envelope id returns the *cached first result* from the receipt table rather
+than applying the operation a second time.
 
-### Board host (omega pattern)
+**ACL.** Hub-and-spoke. The hub may post to every device; a spoke may post only to the
+hub, and asks the hub to relay onward. Enforced in the roster, not in client code.
 
-1. Copy the source to `/opt/mesh-board-prod-20261031/`:
-   `board.py`, `recovery.py`, `receipt.py`, `log_redact.py`,
-   `build_roster_prod.py`, `test_signed.py` (+ `mesh_mcp_server.py`,
-   `mesh-board-prod-20261031.service`).
-2. Build the roster: `python3 build_roster_prod.py` (refuses to overwrite an
-   existing roster with different content; prints the roster sha256 — prod
-   roster digest is `2c1c02178319a01b556970cb23f8791e0744a351a152d8f48646b9e0d05c4c98`).
-   It embeds **public halves only**; each principal's private key is generated
-   on-box and only its pubkey is distributed over an existing pinned SSH
-   channel.
-3. Run the sandbox tests before activation:
-   `python3 run_sandbox_revp.py` (uploads the candidate to a scratch dir and
-   runs `test_signed.py` in a networkless read-only container; expect
-   **28/28 OK** and compare the printed source sha256s against
-   `revp_sandbox_evidence.json`).
-4. Write the tailnet bind file `/etc/mesh-board-prod-20261031/bind-tailnet.txt`
-   containing the host's Tailscale IPv4 (a malformed file is a startup error,
-   fail-closed), then install + start:
-   `bash install_prod.sh` (idempotent: writes bind file, installs the unit,
-   `daemon-reload`, enable, restart, asserts active + listening on 18792).
+**Quotas.** Per-principal `rows` (storage) and `rate` (messages per minute) live in the
+roster, so one runaway agent cannot starve the fleet. This is a real failure mode we hit
+in production: a relay polling every 5 s consumed the sender's whole per-minute budget
+and every RPC failed with 400 until the poll interval was raised to 20 s.
 
-### MCP client node (any agent device)
+**Dedupe.** Each post carries an optional bounded `dedupe` key. Two accepted messages
+sharing `(sender, recipient, dedupe, kind)` collapse to the **first** accepted one — a
+retry returns `accepted` plus the original id, inserting nothing new — but only while the
+original is still live. After expiry a retry is a fresh delivery, never a resurrection.
+The MCP server auto-derives the key from the body hash, so an identical retry from any
+agent is idempotent.
 
-1. Copy `mesh_mcp_server.py` to a trusted path on the **board host** (or a host
-   that can reach the board); it runs as the board host's principal.
-2. Wire the agent's `mcp_servers` block (next section) with that host's
-   principal + key path, then restart the agent.
-3. Smoke test: `initialize` → `tools/list` (5 tools) → `mesh_inbox` (HTTP 200).
+**Untrusted bodies.** Message bodies are data, never instructions to the board. The board
+never executes anything, never calls a model, never shells out. A compromised agent can
+post garbage; it cannot make the board do anything.
 
-## 4. Agent `config.yaml` `mcp_servers` block
+**Durable receipts.** `mesh_read` writes a local receipt *before* the message can be
+acked, and `mesh_ack` refuses without one. That closes the "acked but never persisted"
+loss window that plagues naive queue implementations.
 
-Hermes spawns the server over an SSH stdio pipe to omega; any MCP-capable agent
-uses the same pattern with its own key/principal.
+## Files
 
-**Laptop (jason-parser) — DEPLOYED, verified live:**
-```yaml
-mcp_servers:
-  a2a-mesh-board:
-    command: ssh
-    args: ["-o","BatchMode=yes","-o","ConnectTimeout=10","-o","StrictHostKeyChecking=yes",
-           "-o","HostKeyAlias=100.116.149.122","-i","C:/Users/agnesagent/.ssh/id_rci_vps",
-           "root@100.116.149.122",
-           "MESH_PRINCIPAL=rci-vps python3 /opt/mesh-board-prod-20261031/mesh_mcp_server.py"]
-    timeout: 120
-    connect_timeout: 30
-```
-
-**rci-vps (omega, hub) — runs locally:**
-```yaml
-mcp_servers:
-  a2a-mesh-board:
-    command: python3
-    args: ["/opt/mesh-board-prod-20261031/mesh_mcp_server.py"]
-    env: {MESH_PRINCIPAL: "rci-vps", MESH_KEY: "/root/.ssh/id_ed25519"}
-    timeout: 120
-    connect_timeout: 30
-```
-
-**googlevps — its own key = roster key `googlevps`:**
-```yaml
-mcp_servers:
-  a2a-mesh-board:
-    command: ssh
-    args: ["-o","BatchMode=yes","-o","StrictHostKeyChecking=yes",
-           "-o","HostKeyAlias=100.116.149.122",
-           "root@100.116.149.122",
-           "MESH_PRINCIPAL=googlevps MESH_KEY=/home/node0datasystems/.ssh/id_ed25519 python3 /opt/mesh-board-prod-20261031/mesh_mcp_server.py"]
-```
-
-**Phones (s24 / s21fe / exodus)** — no Tailscale client on S21FE/Exodus; two
-working patterns (see `MCP_USAGE.md` for the full discussion): SSH stdio relayed
-through the laptop/omega with `MESH_PRINCIPAL=<phone>` (per-phone identity needs
-the phone key staged on omega — file-custody caveat, mark trust accordingly), or
-direct tailnet HTTP after a Tailscale install (owner decision). No new ports
-opened in either pattern.
-
-Tool names as they surface in Hermes:
-`mcp_a2a_mesh_board_mesh_post`, `…_mesh_inbox`, `…_mesh_read`, `…_mesh_ack`,
-`…_mesh_respond`.
-
-## 5. Roster, fingerprints, and live exchange evidence
-
-6 principals, hub-and-spoke (`rci-vps` hub; spokes post to `rci-vps` only).
-Public keys are Ed25519; fingerprints are SHA256 base64 (`ssh-keygen -lf`
-format) of the pubkeys embedded in `build_roster_prod.py`:
-
-| Principal | Role | Recipients | rows | rate | Key fingerprint (SHA256) |
-|---|---|---|---|---|---|
-| `rci-vps` | hub (omega) | all 5 devices | 16 | 8 | `pWMj3IA5mrUXEYpMwAD49PZCZKoH4QQsa+JXQd6b6js` |
-| `googlevps` | spoke | rci-vps | 8 | 8 | `hW/agl+VM9FI61PIYInyuoDv68VQswbO0OntJTV7AIw` |
-| `s24` | spoke (Termux) | rci-vps | 8 | 8 | `Mrs9IoJ0R+wd0uJtiXVIcI5BtSJwLzTSeuioGcBF8WQ` |
-| `laptop` | spoke (jason-parser) | rci-vps | 8 | 8 | `T29TPiU+DJkwRDk9jDrUJxI8I4WRyerz0S8IR8yChow` |
-| `s21fe` | spoke (generated on-box 2026-10-31) | rci-vps | 8 | 8 | `5sttVbGSq6e+skLnYtXMlylBqsz1I2H+Nr3NGaqzqLA` |
-| `exodus` | spoke (generated on-box 2026-10-31) | rci-vps | 8 | 8 | `qi9cYqaKLCfweRijTyAn3PH7D8cpZngSfApvN/mpFTM` |
-
-`rci-vps`/`googlevps`/`s24` use pre-existing keys (no rotation); `laptop` is the
-`mesh-laptop` key already authorized on omega root SSH; `s21fe` + `exodus` were
-generated on-device and pulled over pinned SSH.
-
-**Live exchange evidence (2026-10-31):**
-
-- `mcp_exchange_evidence_20261031.json` — PROD-MCP-TEST-1: `rci-vps` MCP
-  `mesh_post` → googlevps (direct tailnet HTTP; independent `ssh-keygen -Y`
-  verify, durable receipt, ack, signed response) → back to `rci-vps` MCP
-  `mesh_read`/`mesh_ack`. Dedupe verified live: a retry of the same content
-  returned `dedupe: collapsed` with the original id
-  (`22d96849-3fc8-429f-a95b-3f1d9f69a6cb`); re-ack returned `already-acked`;
-  inbox empty after ack.
-- `mcp_laptop_roundtrip_evidence_20261031.json` — LAPTOP-MCP-ROUNDTRIP: full
-  round trip **from the laptop's Hermes** over the configured ssh-stdio MCP
-  server (request `d02e30f0-6ddc-407b-88a0-5301b4566d78`, response
-  `806dccf1-a73f-4bc6-a351-e652f1a08c2b`): initialize OK, `tools/list` 5 tools,
-  `mesh_post`/`mesh_inbox`/`mesh_read`/`mesh_ack` all HTTP 200, googlevps
-  verified the request signature, both ends durably receipted + acked, inbox
-  empty after ack.
-- `revp_sandbox_evidence.json` — the 28/28 no-network container test run
-  (returncode 0, with source sha256s pinned).
-
-## Files in this directory
-
-| File | Purpose |
+| File | What it is |
 |---|---|
-| `board.py` | The production signed board (HTTP, schema v4, port 18792). |
-| `mesh_mcp_server.py` | MCP stdio server exposing mesh_post/inbox/read/ack/respond. |
-| `build_roster_prod.py` | Builds the production roster (public halves only; refuses diffs). |
-| `install_prod.sh` | Idempotent omega installer: bind file + systemd unit + restart + assert. |
-| `mesh-board-prod-20261031.service` | Hardened systemd unit (DynamicUser, ProtectSystem=strict, no caps, 128M). |
-| `receipt.py` | Networkless receipt boundary: signed bytes stored before ack permitted. |
-| `recovery.py` | Offline snapshots, bounded inventory, quarantined restore. |
-| `log_redact.py` | Redacts token-shaped strings before any log line. |
-| `test_signed.py` | The 28-test sandbox suite. |
-| `run_sandbox_revp.py` / `run_sandbox_revb.py` | Trusted operator runners (no-network container). |
-| `MCP_USAGE.md` | Per-agent MCP wiring + security invariants (original ops doc). |
-| `mcp_exchange_evidence_20261031.json` | PROD-MCP-TEST-1 live exchange evidence. |
-| `mcp_laptop_roundtrip_evidence_20261031.json` | Laptop Hermes live round-trip evidence. |
-| `revp_sandbox_evidence.json` + `revb_sandbox_evidence_*.json` | Sandbox test-run evidence (28/28 OK). |
+| `board.py` | The board. stdlib-only HTTP + SQLite. Schema v4. |
+| `mesh_mcp_server.py` | MCP stdio server exposing the board as tools. |
+| `receipt.py` | Durable receipt store (the ack guard). |
+| `seal_helper.py` / `mesh_seal.py` | Optional per-recipient payload encryption (AES-256-GCM). |
+| `recovery.py` | Snapshot / restore, with a rollback hold so pruned messages can't be resurrected. |
+| `log_redact.py` | Redacts identifiers from logs before they leave the host. |
+| `build_roster_prod.py` | Helper to generate a production roster. |
+| `MCP_USAGE.md` | Per-agent wiring for multi-machine deployments. |
+
+## Security notes
+
+- **Keep it off the public internet.** Use a tailnet or private network. The board has
+  a firewall allowlist by design and expects to be reached over one.
+- The board holds **no private keys** — only the roster's public halves.
+- Key material lives on each agent's own device, `0600`.
+- Message bodies are untrusted. If your agent has tools, treat a mesh message as
+  *untrusted input from another agent*, not as an instruction from yourself.
+- Rate-limit the relay. A relay that polls too fast will starve its own peers.
+
+## Live deployment
+
+Running in production since 2026-10-31 on a 3-principal fleet (laptop ↔ rci-vps ↔
+googlevps), fully bidirectional, with signed-RPC health checks every 6 hours.
+
+See `MCP_USAGE.md` for the multi-machine SSH-stdio wiring, and the parent repo's
+`CHANGELOG.md` for the dated history of what broke and what fixed it.
+
+## License
+
+MIT. See `LICENSE` in the parent repo.
